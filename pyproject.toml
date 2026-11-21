@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "redes-audio-live"
+version = "0.1.0"
+description = "Áudio UDP ao vivo com transcrição, checagem de fatos e cliente PySide6"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+authors = [
+  { name = "Equipe do Projeto 2" },
+]
+dependencies = [
+  "fastapi>=0.115,<1",
+  "pydantic-settings>=2.7,<3",
+  "uvicorn[standard]>=0.34,<1",
+  "websockets>=14,<17",
+]
+
+[project.optional-dependencies]
+client = [
+  "numpy>=2,<3",
+  "PySide6>=6.8,<7",
+  "sounddevice>=0.5,<1",
+]
+ai = [
+  "faster-whisper>=1.1,<2",
+  "httpx>=0.28,<1",
+  "scikit-learn>=1.5,<2",
+  "cryptography>=44,<47",
+]
+codec = [
+  "opuslib>=3,<4",
+]
+experiments = [
+  "jiwer>=4,<5",
+  "matplotlib>=3.9,<4",
+  "pandas>=2.2,<4",
+]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8,<10",
+  "pytest-asyncio>=0.25,<2",
+  "ruff>=0.11,<1",
+]
+
+[project.scripts]
+redes-server = "redes_audio.server.__main__:main"
+redes-client = "redes_audio.client.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
