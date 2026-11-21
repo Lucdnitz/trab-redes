@@ -6,6 +6,7 @@ import asyncio
 import json
 import uuid
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ from redes_audio import __version__
 from redes_audio.server.broadcaster import AudioBroadcaster
 from redes_audio.server.config import settings
 from redes_audio.server.registry import ClientEndpoint, ClientRegistry
+from redes_audio.server.summary import RollingSummary
 
 
 class HealthResponse(BaseModel):
@@ -23,11 +25,17 @@ class HealthResponse(BaseModel):
 
 
 registry = ClientRegistry()
+rolling_summary = RollingSummary()
 broadcaster = AudioBroadcaster(
     registry,
     sample_rate=settings.sample_rate,
     frame_ms=settings.frame_duration_ms,
 )
+
+
+def summary_payload() -> dict[str, object]:
+    """Serializa o último resumo confirmado para HTTP e WebSocket."""
+    return asdict(rolling_summary.snapshot())
 
 
 @asynccontextmanager
@@ -58,6 +66,7 @@ async def session_status() -> dict[str, object]:
         ],
         "sample_rate": settings.sample_rate,
         "frame_duration_ms": settings.frame_duration_ms,
+        "summary": summary_payload(),
     }
 
 
@@ -93,6 +102,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 "client_id": client_id,
                 "sample_rate": settings.sample_rate,
                 "frame_duration_ms": settings.frame_duration_ms,
+                "summary": summary_payload(),
             }
         )
 

@@ -31,7 +31,17 @@ O formato inicial é PCM signed 16-bit little-endian, mono, 16 kHz e quadros de 
 - thread principal: somente PySide6 e reação a sinais;
 - worker de rede: UDP e WebSocket;
 - worker de reprodução: consumo periódico do jitter buffer;
-- tarefas futuras de ASR/RAG: servidor, fora do caminho crítico do áudio.
+- tarefas futuras de ASR/resumo: servidor, fora do caminho crítico do áudio.
+
+## Resumo incremental
+
+O servidor acumula segmentos finalizados da transcrição e atualiza um resumo curto em
+intervalos maiores que os do áudio. O resumo anterior e somente os trechos novos formam a
+entrada da atualização, evitando reprocessar toda a sessão.
+
+Um cliente que entra no meio recebe imediatamente o último resumo confirmado e passa a
+acompanhar as novas legendas. A atualização do resumo é assíncrona e nunca bloqueia UDP,
+reprodução ou envio de legendas.
 
 ## Modo headless
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "redes-audio-live"
 version = "0.1.0"
-description = "Áudio UDP ao vivo com transcrição, checagem de fatos e cliente PySide6"
+description = "Áudio UDP ao vivo com transcrição, resumo incremental e cliente PySide6"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 authors = [
@@ -27,7 +27,6 @@ client = [
 ai = [
   "faster-whisper>=1.1,<2",
   "httpx>=0.28,<1",
-  "scikit-learn>=1.5,<2",
   "cryptography>=44,<47",
 ]
 codec = [

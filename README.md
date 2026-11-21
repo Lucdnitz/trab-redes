@@ -1,4 +1,4 @@
-# Áudio ao vivo com transcrição e checagem de fatos
+# Áudio ao vivo com transcrição e resumo incremental
 
 Projeto 2 da disciplina de Redes de Computadores da UFES. O sistema transmite áudio em
 pacotes UDP para múltiplos clientes, mantém um canal WebSocket separado para texto e
@@ -18,21 +18,22 @@ Este primeiro marco contém:
 - scripts PowerShell para configuração, execução e verificação;
 - planejamento acadêmico em `output/pdf/`.
 
-Transcrição, RAG, Opus e automação com `tc netem` estão isolados como próximos módulos.
+Transcrição, resumo ao vivo, Opus e automação com `tc netem` estão isolados como próximos
+módulos.
 
 ## Arquitetura
 
 ```text
 Servidor Python / FastAPI
 ├── UDP: áudio PCM/Opus com sequência e timestamp
-└── WebSocket: registro, legendas, fatos e controle
+└── WebSocket: registro, legendas, resumo e controle
                 │
                 ▼
 Cliente desktop PySide6
 ├── receptor UDP
 ├── jitter buffer
 ├── reprodução de áudio
-├── legendas e checagem de fatos
+├── legendas e resumo ao vivo
 └── métricas e controles
 ```
 
@@ -99,7 +100,7 @@ docs/             # decisões e contratos
 ## Princípios
 
 1. A GUI apresenta estado; o núcleo toma decisões.
-2. O áudio nunca é bloqueado pela transcrição ou pelo RAG.
+2. O áudio nunca é bloqueado pela transcrição ou pelo resumo.
 3. Toda medição deve ser reproduzível e exportável.
 4. Erros de rede devem ser observáveis e compreensíveis.
 5. Código e contratos ficam em inglês; documentação e interface ficam em português.

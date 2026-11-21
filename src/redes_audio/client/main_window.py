@@ -47,8 +47,8 @@ class MainWindow(QMainWindow):
         self.transcript_label = QLabel("Aguardando legenda...")
         self.transcript_label.setWordWrap(True)
         self.transcript_label.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.fact_label = QLabel("Checagem ainda não disponível")
-        self.fact_label.setWordWrap(True)
+        self.summary_label = QLabel("Resumo ainda não disponível")
+        self.summary_label.setWordWrap(True)
 
         self.metric_labels = {
             name: QLabel("0")
@@ -79,10 +79,10 @@ class MainWindow(QMainWindow):
         connection_form.addRow("Estado", self.status_label)
 
         content_layout = QHBoxLayout()
-        transcript_group = QGroupBox("Legenda e checagem")
+        transcript_group = QGroupBox("Legenda e resumo ao vivo")
         transcript_layout = QVBoxLayout(transcript_group)
         transcript_layout.addWidget(self.transcript_label, 2)
-        transcript_layout.addWidget(self.fact_label, 1)
+        transcript_layout.addWidget(self.summary_label, 1)
 
         metrics_group = QGroupBox("Métricas")
         metrics_layout = QGridLayout(metrics_group)
@@ -138,6 +138,9 @@ class MainWindow(QMainWindow):
     def _on_connected(self, event: dict) -> None:
         self.status_label.setText(f"Conectado: {event.get('client_id', '')[:8]}")
         self.status_label.setStyleSheet("font-weight: 700; color: #067647;")
+        summary = event.get("summary", {})
+        if summary.get("text"):
+            self.summary_label.setText(str(summary["text"]))
         self.connect_button.setEnabled(False)
         self.pause_button.setEnabled(True)
         self.stop_button.setEnabled(True)
@@ -145,8 +148,8 @@ class MainWindow(QMainWindow):
     def _on_event(self, event: dict) -> None:
         if event.get("type") == "transcript":
             self.transcript_label.setText(str(event.get("text", "")))
-        elif event.get("type") == "fact":
-            self.fact_label.setText(str(event.get("label", "")))
+        elif event.get("type") == "summary":
+            self.summary_label.setText(str(event.get("text", "")))
 
     def _update_metrics(self, metrics: dict) -> None:
         for key, label in self.metric_labels.items():

@@ -61,8 +61,8 @@ def architecture_diagram() -> Drawing:
 
     boxes = [
         (12, 156, 88, 48, "FONTE", "WAV ou microfone", AMBER_LIGHT, AMBER),
-        (124, 140, 130, 80, "SERVIDOR PYTHON", "FastAPI + UDP\nWhisper + RAG\nWebSocket", BLUE_LIGHT, TEAL),
-        (298, 132, 188, 96, "CLIENTE DESKTOP PYSIDE6", "UDP + jitter buffer + codec\náudio + legendas + fatos\ncontroles + métricas", GREEN_LIGHT, GREEN),
+        (124, 140, 130, 80, "SERVIDOR PYTHON", "FastAPI + UDP\nWhisper + resumo\nWebSocket", BLUE_LIGHT, TEAL),
+        (298, 132, 188, 96, "CLIENTE DESKTOP PYSIDE6", "UDP + jitter buffer + codec\náudio + legendas + resumo\ncontroles + métricas", GREEN_LIGHT, GREEN),
         (124, 38, 130, 56, "NÚCLEO HEADLESS", "mesmos módulos sem GUI\npara testes e experimento", WHITE, NAVY_2),
         (298, 38, 188, 56, "EVIDÊNCIAS", "CSV + WAV reconstruído + gráficos\nWER, perda, banda e latência", WHITE, NAVY_2),
     ]
@@ -92,7 +92,7 @@ def module_tree() -> Table:
         "├─ media/broadcaster.py<br/>"
         "├─ realtime/websocket.py<br/>"
         "├─ transcription/whisper.py<br/>"
-        "└─ factcheck/rag.py"
+        "└─ summary/service.py"
     )
     middle = (
         "<b>client/</b><br/>"
@@ -212,11 +212,11 @@ def build_story() -> list:
     stack = [
         [p("Camada", "TableHeader"), p("Tecnologia", "TableHeader"), p("Responsabilidade", "TableHeader")],
         [p("Servidor", "TableCellBold"), p("FastAPI + asyncio", "TableCell"), p("Sessões, registro dos clientes, áudio UDP e eventos WebSocket.", "TableCell")],
-        [p("Cliente desktop", "TableCellBold"), p("PySide6 Widgets", "TableCell"), p("Conexão, reprodução, legendas, fatos, controles e métricas.", "TableCell")],
+        [p("Cliente desktop", "TableCellBold"), p("PySide6 Widgets", "TableCell"), p("Conexão, reprodução, legendas, resumo, controles e métricas.", "TableCell")],
         [p("Áudio", "TableCellBold"), p("sounddevice + NumPy", "TableCell"), p("Entrada/saída PCM e integração com o jitter buffer.", "TableCell")],
         [p("Codec", "TableCellBold"), p("PCM + Opus", "TableCell"), p("Abstração encode/decode comum para demonstração e experimento.", "TableCell")],
         [p("Transcrição", "TableCellBold"), p("faster-whisper", "TableCell"), p("ASR local no servidor, modelo base/int8 como ponto inicial.", "TableCell")],
-        [p("Checagem", "TableCellBold"), p("TF-IDF + Ollama", "TableCell"), p("Recuperação, veredito e fonte consultada.", "TableCell")],
+        [p("Resumo", "TableCellBold"), p("Estado incremental + Ollama", "TableCell"), p("Resumo acumulado para quem entra no meio da transmissão.", "TableCell")],
         [p("Evidências", "TableCellBold"), p("jiwer + pandas + matplotlib", "TableCell"), p("WER, CSV, agregação e gráficos reproduzíveis.", "TableCell")],
         [p("Distribuição", "TableCellBold"), p("Scripts; PyInstaller opcional", "TableCell"), p("Um comando no desenvolvimento e executável se houver tempo.", "TableCell")],
     ]
@@ -246,7 +246,7 @@ def build_story() -> list:
     flows = [
         [p("Fluxo", "TableHeader"), p("Transporte", "TableHeader"), p("Conteúdo", "TableHeader"), p("Comportamento", "TableHeader")],
         [p("Áudio", "TableCellBold"), p("UDP", "TableCell"), p("PCM/Opus + sequência + timestamp", "TableCell"), p("Baixa latência, perda observável, sem retransmissão.", "TableCell")],
-        [p("Texto", "TableCellBold"), p("WebSocket", "TableCell"), p("Legendas, fatos e assinaturas", "TableCell"), p("Ordenado e confiável; pode chegar depois do áudio.", "TableCell")],
+        [p("Texto", "TableCellBold"), p("WebSocket", "TableCell"), p("Legendas, resumo e assinaturas", "TableCell"), p("Ordenado e confiável; pode chegar depois do áudio.", "TableCell")],
         [p("Controle", "TableCellBold"), p("WebSocket", "TableCell"), p("Registro, pausa, continuar e parar", "TableCell"), p("Estado explícito da sessão e do cliente.", "TableCell")],
         [p("Experimento", "TableCellBold"), p("Headless", "TableCell"), p("Mesmo receptor, jitter e codecs", "TableCell"), p("Substitui GUI por captura WAV e CSV.", "TableCell")],
     ]
@@ -314,7 +314,7 @@ def build_story() -> list:
             [p("INTEGRANTE A • SERVIDOR E EXPERIMENTO", "CardTitle"), p("INTEGRANTE B • CLIENTE E INTELIGÊNCIA", "CardTitle")],
             [
                 p("Protocolo; broadcaster UDP; sessão WebSocket; PCM/Opus; netem; captura headless; CSV; WER; gráficos e orçamento de latência.", "CardBody"),
-                p("PySide6; workers e sinais; áudio; legendas; controles; faster-whisper; RAG/Ollama; Ed25519 e experiência da demonstração.", "CardBody"),
+                p("PySide6; workers e sinais; áudio; legendas; controles; faster-whisper; resumo/Ollama; Ed25519 e experiência da demonstração.", "CardBody"),
             ],
             [p("Revisa: sincronização, IA e roteiro.", "CardBody"), p("Revisa: pacote, métricas e reprodutibilidade.", "CardBody")],
         ],
@@ -339,7 +339,7 @@ def build_story() -> list:
         [p("Marco", "TableHeader"), p("Entrada", "TableHeader"), p("Critério de aceite conjunto", "TableHeader")],
         [p("M1 • Transporte", "TableCellBold"), p("Servidor UDP + cliente core", "TableCell"), p("Dois processos recebem e ordenam o mesmo áudio.", "TableCell")],
         [p("M2 • Aplicação", "TableCellBold"), p("Core + PySide6", "TableCell"), p("Conectar, tocar, pausar e mostrar métricas sem travar a UI.", "TableCell")],
-        [p("M3 • Inteligência", "TableCellBold"), p("WebSocket + ASR/RAG", "TableCell"), p("Legenda temporal, selo, fonte e assinatura válida.", "TableCell")],
+        [p("M3 • Inteligência", "TableCellBold"), p("WebSocket + ASR/resumo", "TableCell"), p("Legenda temporal, resumo incremental e assinatura válida.", "TableCell")],
         [p("M4 • Evidência", "TableCellBold"), p("Core headless + netem", "TableCell"), p("30 linhas válidas em CSV e gráficos reproduzíveis.", "TableCell")],
     ]
     story += [styled_table(milestones, [38 * mm, 56 * mm, 84 * mm]), Spacer(1, 7)]
@@ -361,8 +361,8 @@ def build_story() -> list:
         [p("17:00-20:00", "TableCellBold"), p("Broadcaster UDP + contratos WebSocket.", "TableCell"), p("Receiver + jitter + playback PCM.", "TableCell"), p("M1: áudio em dois clientes core.", "TableCell")],
         [p("20:00-21:00", "TableCellBold"), p("Integração e revisão", "TableCell"), p("Integração e revisão", "TableCell"), p("Protocolo congelado; primeira demo gravada.", "TableCell")],
         [p("21:00-23:30", "TableCellBold"), p("Métricas, controles e captura headless.", "TableCell"), p("PySide6, workers, sinais e legenda.", "TableCell"), p("M2: cliente desktop funcional.", "TableCell")],
-        [p("22/11 • 08:00-10:30", "TableCellBold"), p("Opus + automação netem.", "TableCell"), p("Whisper + RAG + Ed25519.", "TableCell"), p("M3: incrementos isolados funcionando.", "TableCell")],
-        [p("10:30-13:30", "TableCellBold"), p("Executar matriz de 30 testes.", "TableCell"), p("30 afirmações e acabamento da GUI.", "TableCell"), p("M4: CSV e avaliação da inteligência.", "TableCell")],
+        [p("22/11 • 08:00-10:30", "TableCellBold"), p("Opus + automação netem.", "TableCell"), p("Whisper + resumo + Ed25519.", "TableCell"), p("M3: incrementos isolados funcionando.", "TableCell")],
+        [p("10:30-13:30", "TableCellBold"), p("Executar matriz de 30 testes.", "TableCell"), p("Cenários de entrada tardia + GUI.", "TableCell"), p("M4: CSV e avaliação do resumo.", "TableCell")],
         [p("13:30-15:30", "TableCellBold"), p("Gráficos e latência.", "TableCell"), p("Análise, fontes e pergunta-desafio.", "TableCell"), p("M5: figuras finais aprovadas.", "TableCell")],
         [p("15:30-18:00", "TableCellBold"), p("README e reprodução limpa.", "TableCell"), p("Relatório e roteiro da demonstração.", "TableCell"), p("M6: entrega candidata congelada.", "TableCell")],
         [p("18:00-19:30", "TableCellBold"), p("Ensaio e correções críticas", "TableCell"), p("Ensaio e correções críticas", "TableCell"), p("M7: backup, upload e confirmação.", "TableCell")],
@@ -371,7 +371,7 @@ def build_story() -> list:
     priority = Table(
         [
             [p("1", "BigMetric"), p("2", "BigMetric"), p("3", "BigMetric"), p("4", "BigMetric")],
-            [p("UDP + jitter", "MetricLabel"), p("Experimento", "MetricLabel"), p("Legenda + fatos", "MetricLabel"), p("GUI + executável", "MetricLabel")],
+            [p("UDP + jitter", "MetricLabel"), p("Experimento", "MetricLabel"), p("Legenda + resumo", "MetricLabel"), p("GUI + executável", "MetricLabel")],
         ],
         colWidths=[CONTENT_W / 4] * 4,
     )
@@ -471,16 +471,16 @@ def build_story() -> list:
     # 7. Incrementos e interface
     story += heading(
         "6. Incrementos e experiência do cliente",
-        "A dupla cobre Inteligência e Segurança. O painel desktop torna esses resultados visíveis sem bloquear o caminho crítico do áudio.",
+        "A dupla cobre Inteligência e Segurança. O resumo ajuda quem entra no meio da transmissão sem bloquear o caminho crítico do áudio.",
     )
     increments = Table(
         [
-            [p("INTELIGÊNCIA • FATOS", "CardTitle"), p("SEGURANÇA • INTEGRIDADE", "CardTitle")],
+            [p("INTELIGÊNCIA • RESUMO AO VIVO", "CardTitle"), p("SEGURANÇA • INTEGRIDADE", "CardTitle")],
             [
-                p("Sentença verificável → recuperação Top-3 → Ollama → selo confirmada, contestada ou sem evidência → fonte real.", "CardBody"),
+                p("Trechos finalizados → contexto pendente → Ollama → resumo curto atualizado para ouvintes que entram depois.", "CardBody"),
                 p("Ed25519 sobre session_id, sequence, start_ms, end_ms e text. Qualquer alteração invalida o trecho.", "CardBody"),
             ],
-            [p("Avaliação: 15 verdadeiras + 15 falsas.", "CardBody"), p("Demonstração: adulterar uma legenda e rejeitá-la.", "CardBody")],
+            [p("Avaliação: latência, compressão e cobertura de pontos-chave.", "CardBody"), p("Demonstração: adulterar uma legenda e rejeitá-la.", "CardBody")],
         ],
         colWidths=[CONTENT_W / 2, CONTENT_W / 2],
     )
@@ -503,7 +503,7 @@ def build_story() -> list:
         [p("Área da janela", "TableHeader"), p("Informação", "TableHeader"), p("Origem", "TableHeader")],
         [p("Conexão", "TableCellBold"), p("Servidor, porta UDP, jitter e codec.", "TableCell"), p("Configuração do cliente.", "TableCell")],
         [p("Legenda", "TableCellBold"), p("Texto atual, intervalo temporal e integridade.", "TableCell"), p("WebSocket + verificação Ed25519.", "TableCell")],
-        [p("Fatos", "TableCellBold"), p("Selo, afirmação, fonte e justificativa curta.", "TableCell"), p("Atualização assíncrona do backend.", "TableCell")],
+        [p("Resumo", "TableCellBold"), p("Síntese acumulada e ponto temporal processado.", "TableCell"), p("Atualização assíncrona do backend.", "TableCell")],
         [p("Métricas", "TableCellBold"), p("Recebidos, perdidos, atrasados, jitter e latência.", "TableCell"), p("Núcleo UDP/jitter buffer.", "TableCell")],
         [p("Controles", "TableCellBold"), p("Conectar, pausar, continuar e parar.", "TableCell"), p("Máquina de estados do cliente.", "TableCell")],
     ]
@@ -517,7 +517,7 @@ def build_story() -> list:
         Spacer(1, 7),
         card(
             "COMPORTAMENTO ASSÍNCRONO",
-            "A legenda aparece quando disponível; o selo factual chega depois como atualização da mesma sequência. A GUI deixa claro quando a checagem ainda está pendente.",
+            "A legenda aparece quando disponível; o resumo é atualizado em intervalos maiores. A GUI mostra até qual sequência e instante o resumo está confirmado.",
             AMBER_LIGHT,
             AMBER,
         ),
@@ -550,7 +550,7 @@ def build_story() -> list:
         [p("0:00-0:40", "TableCellBold"), p("Arquitetura: UDP para áudio, WebSocket para texto e controle.", "TableCell")],
         [p("0:40-1:40", "TableCellBold"), p("Duas janelas clientes recebem o mesmo áudio; mostrar sequência e timestamp.", "TableCell")],
         [p("1:40-2:30", "TableCellBold"), p("Alterar jitter buffer; exibir perda, atraso, pausa e retomada.", "TableCell")],
-        [p("2:30-3:30", "TableCellBold"), p("Legenda, selo factual, fonte e detecção de trecho adulterado.", "TableCell")],
+        [p("2:30-3:30", "TableCellBold"), p("Legenda, resumo para entrada tardia e detecção de trecho adulterado.", "TableCell")],
         [p("3:30-4:30", "TableCellBold"), p("Gráficos WER x perda, banda PCM/Opus e orçamento de latência.", "TableCell")],
         [p("4:30-5:00", "TableCellBold"), p("Responder onde transcrever usando os próprios resultados.", "TableCell")],
     ]
@@ -560,11 +560,11 @@ def build_story() -> list:
             [p("CHECKLIST", "CardTitle"), p("RELATÓRIO • ATÉ 6 PÁGINAS", "CardTitle")],
             [
                 p(
-                    "□ instalação do zero<br/>□ servidor e dois clientes<br/>□ áudio PCM/Opus<br/>□ CSV das 30 execuções<br/>□ gráficos versionados<br/>□ 30 afirmações avaliadas<br/>□ README e comandos<br/>□ backup e upload conferido",
+                    "□ instalação do zero<br/>□ servidor e dois clientes<br/>□ áudio PCM/Opus<br/>□ CSV das 30 execuções<br/>□ gráficos versionados<br/>□ resumo de entrada tardia<br/>□ README e comandos<br/>□ backup e upload conferido",
                     "CardBody",
                 ),
                 p(
-                    "1. Problema e arquitetura<br/>2. Protocolo, jitter e GUI<br/>3. Transcrição, RAG e integridade<br/>4. Metodologia experimental<br/>5. Resultados e discussão<br/>6. Pergunta-desafio e conclusão",
+                    "1. Problema e arquitetura<br/>2. Protocolo, jitter e GUI<br/>3. Transcrição, resumo e integridade<br/>4. Metodologia experimental<br/>5. Resultados e discussão<br/>6. Pergunta-desafio e conclusão",
                     "CardBody",
                 ),
             ],
@@ -598,7 +598,7 @@ def build_story() -> list:
     story += [
         card(
             "CRITÉRIO FINAL DE SUCESSO",
-            "A equipe instala o ambiente, inicia o servidor e dois clientes desktop, demonstra áudio e legendas, reproduz o experimento e explica cada decisão com base nos conceitos da disciplina.",
+            "A equipe instala o ambiente, inicia o servidor e dois clientes desktop, demonstra áudio, legendas, resumo e integridade, reproduz o experimento e explica cada decisão com base nos conceitos da disciplina.",
             TEAL_LIGHT,
             TEAL,
         )
@@ -609,8 +609,8 @@ def build_story() -> list:
 def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     doc = PlanningDocTemplate(str(OUTPUT))
-    doc.title = "Planejamento - Projeto 2 de Redes - PySide6"
-    doc.subject = "Áudio ao vivo com cliente desktop PySide6"
+    doc.title = "Planejamento - Projeto 2 de Redes - Resumo ao vivo"
+    doc.subject = "Áudio ao vivo com transcrição, resumo incremental e cliente PySide6"
     doc.build(build_story())
     print(OUTPUT)
 
