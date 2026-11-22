@@ -12,7 +12,10 @@ authors = [
   { name = "Equipe do Projeto 2" },
 ]
 dependencies = [
+  "cryptography>=44,<47",
   "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "numpy>=2,<3",
   "pydantic-settings>=2.7,<3",
   "uvicorn[standard]>=0.34,<1",
   "websockets>=14,<17",
@@ -20,17 +23,15 @@ dependencies = [
 
 [project.optional-dependencies]
 client = [
-  "numpy>=2,<3",
   "PySide6>=6.8,<7",
   "sounddevice>=0.5,<1",
 ]
 ai = [
+  "av>=11,<20",
   "faster-whisper>=1.1,<2",
-  "httpx>=0.28,<1",
-  "cryptography>=44,<47",
 ]
 codec = [
-  "opuslib>=3,<4",
+  "av>=11,<20",
 ]
 experiments = [
   "jiwer>=4,<5",

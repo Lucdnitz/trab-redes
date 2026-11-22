@@ -11,7 +11,7 @@ $PythonExe = Join-Path $VenvPath "Scripts\python.exe"
 if ($LASTEXITCODE -ne 0) {
     throw "Falha ao atualizar o pip."
 }
-& $PythonExe -m pip install -e "$ProjectRoot[client,dev]"
+& $PythonExe -m pip install -e "$ProjectRoot[client,ai,experiments,dev]"
 if ($LASTEXITCODE -ne 0) {
     throw "Falha ao instalar as dependências do projeto."
 }

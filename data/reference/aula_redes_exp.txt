@@ -1,0 +1,1 @@
+Na aula de Redes estudamos a diferença entre os protocolos U D P e T C P. O áudio ao vivo tolera pequenas perdas, mas exige atraso baixo para não travar. O jitter buffer do cliente organiza os pacotes antes da reprodução final. Com o codec Opus enviamos menos bytes por segundo pela rede sem perder clareza.

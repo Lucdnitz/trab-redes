@@ -16,6 +16,7 @@ class JitterMetrics:
     late: int = 0
     duplicates: int = 0
     overflow_drops: int = 0
+    bytes_received: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return asdict(self)
@@ -26,26 +27,52 @@ class JitterBuffer:
 
     O consumo começa somente após `prefill_frames` quadros. Depois disso, cada chamada a
     `pop_next` avança exatamente uma sequência; uma lacuna é registrada como perda.
+    Se o fluxo parar de enviar por `idle_rearm_frames` quadros consecutivos sem pacotes
+    pendentes, o buffer volta a aguardar `prefill_frames` para não contar perdas infinitas.
     """
 
-    def __init__(self, *, prefill_frames: int = 5, max_frames: int = 50) -> None:
+    def __init__(
+        self,
+        *,
+        prefill_frames: int = 5,
+        max_frames: int = 50,
+        idle_rearm_frames: int = 25,
+    ) -> None:
         if prefill_frames < 1:
             raise ValueError("prefill_frames must be positive")
         if max_frames < prefill_frames:
             raise ValueError("max_frames must be greater than or equal to prefill_frames")
+        if idle_rearm_frames < 1:
+            raise ValueError("idle_rearm_frames must be positive")
 
         self.prefill_frames = prefill_frames
         self.max_frames = max_frames
+        self.idle_rearm_frames = idle_rearm_frames
         self._packets: dict[int, AudioPacket] = {}
         self._expected_sequence: int | None = None
         self._started = False
+        self._idle_gaps = 0
+        self._pending_empty_losses = 0
         self._metrics = JitterMetrics()
         self._lock = Lock()
 
-    def push(self, packet: AudioPacket) -> bool:
+    def push(self, packet: AudioPacket, *, wire_bytes: int | None = None) -> bool:
         """Insere um pacote; retorna `False` quando ele não pode mais ser reproduzido."""
         with self._lock:
             self._metrics.received += 1
+            self._metrics.bytes_received += (
+                wire_bytes if wire_bytes is not None else len(packet.payload)
+            )
+
+            # Reinício limpo se um novo stream começar do zero após o anterior ter parado.
+            if (
+                not self._started
+                and not self._packets
+                and self._expected_sequence is not None
+                and packet.sequence < self._expected_sequence
+            ):
+                self._expected_sequence = None
+                self._pending_empty_losses = 0
 
             if self._expected_sequence is not None and packet.sequence < self._expected_sequence:
                 self._metrics.late += 1
@@ -53,6 +80,10 @@ class JitterBuffer:
             if packet.sequence in self._packets:
                 self._metrics.duplicates += 1
                 return False
+
+            if self._pending_empty_losses > 0:
+                self._metrics.lost += self._pending_empty_losses
+                self._pending_empty_losses = 0
 
             if len(self._packets) >= self.max_frames:
                 oldest = min(self._packets)
@@ -70,6 +101,8 @@ class JitterBuffer:
                     return None
                 self._expected_sequence = min(self._packets)
                 self._started = True
+                self._idle_gaps = 0
+                self._pending_empty_losses = 0
 
             assert self._expected_sequence is not None
             sequence = self._expected_sequence
@@ -77,17 +110,41 @@ class JitterBuffer:
             packet = self._packets.pop(sequence, None)
 
             if packet is None:
-                self._metrics.lost += 1
+                if self._packets:
+                    self._idle_gaps = 0
+                    self._metrics.lost += 1 + self._pending_empty_losses
+                    self._pending_empty_losses = 0
+                    return None
+
+                self._idle_gaps += 1
+                if self._idle_gaps >= self.idle_rearm_frames:
+                    self._started = False
+                    self._idle_gaps = 0
+                    self._pending_empty_losses = 0
+                else:
+                    self._pending_empty_losses += 1
                 return None
 
+            self._idle_gaps = 0
             self._metrics.played += 1
             return packet
+
+    def rearm(self) -> None:
+        """Descarta fila atual para ressincronizar ao vivo sem zerar métricas."""
+        with self._lock:
+            self._packets.clear()
+            self._expected_sequence = None
+            self._started = False
+            self._idle_gaps = 0
+            self._pending_empty_losses = 0
 
     def reset(self) -> None:
         with self._lock:
             self._packets.clear()
             self._expected_sequence = None
             self._started = False
+            self._idle_gaps = 0
+            self._pending_empty_losses = 0
             self._metrics = JitterMetrics()
 
     def metrics(self) -> JitterMetrics:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from threading import Event
 
 from PySide6.QtCore import QThread, Signal
@@ -23,7 +24,7 @@ class DatagramReceiver(asyncio.DatagramProtocol):
             packet = AudioPacket.decode(data)
         except PacketDecodeError:
             return
-        self.buffer.push(packet)
+        self.buffer.push(packet, wire_bytes=len(data))
         self.on_packet()
 
 
@@ -39,6 +40,7 @@ class NetworkWorker(QThread):
         self.udp_port = udp_port
         self.buffer = buffer
         self._stop_event = Event()
+        self._last_metrics_emit = 0.0
 
     def run(self) -> None:
         try:
@@ -64,12 +66,17 @@ class NetworkWorker(QThread):
                     try:
                         raw = await asyncio.wait_for(websocket.recv(), timeout=0.25)
                     except TimeoutError:
+                        self._publish_metrics()
                         continue
                     self.event_received.emit(json.loads(raw))
         finally:
             transport.close()
 
-    def _publish_metrics(self) -> None:
+    def _publish_metrics(self, *, force: bool = False) -> None:
+        now = time.monotonic()
+        if not force and now - self._last_metrics_emit < 0.2:
+            return
+        self._last_metrics_emit = now
         values = self.buffer.metrics().to_dict()
         values["depth"] = self.buffer.depth()
         self.metrics_changed.emit(values)

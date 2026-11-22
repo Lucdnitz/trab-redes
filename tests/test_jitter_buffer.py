@@ -31,3 +31,23 @@ def test_counts_missing_and_late_packets() -> None:
     metrics = buffer.metrics()
     assert metrics.lost == 1
     assert metrics.late == 1
+
+
+def test_rearms_after_idle_and_accepts_restarted_stream() -> None:
+    buffer = JitterBuffer(prefill_frames=2, max_frames=10, idle_rearm_frames=3)
+    buffer.push(packet(0))
+    buffer.push(packet(1))
+
+    assert buffer.pop_next().sequence == 0
+    assert buffer.pop_next().sequence == 1
+
+    # 3 leituras vazias seguidas sinalizam fim/pausa do fluxo sem contar perdas falsas.
+    for _ in range(3):
+        assert buffer.pop_next() is None
+
+    assert buffer.metrics().lost == 0
+
+    # Um novo stream reiniciando na sequência 0 deve ser aceito normalmente.
+    assert buffer.push(packet(0)) is True
+    assert buffer.push(packet(1)) is True
+    assert buffer.pop_next().sequence == 0
