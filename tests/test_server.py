@@ -72,6 +72,7 @@ def test_stream_sends_control_events_and_udp_packet() -> None:
             )
             assert response.status_code == 202
             assert response.json()["accepted"] is True
+            assert response.json()["wav_path"].endswith("aula tecnologia.mp3")
             assert websocket.receive_json()["type"] == "stream_started"
 
             datagram, _address = receiver.recvfrom(2_048)

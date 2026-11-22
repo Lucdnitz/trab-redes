@@ -21,7 +21,7 @@ from redes_audio.shared.protocol import AudioCodec
 from redes_audio.shared.signing import TranscriptSigner
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_WAV_PATH = PROJECT_ROOT / "data" / "reference" / "aula_redes.wav"
+DEFAULT_WAV_PATH = PROJECT_ROOT / "data" / "reference" / "aula tecnologia.mp3"
 
 
 class HealthResponse(BaseModel):
@@ -121,7 +121,7 @@ async def start_stream(request: StreamStartRequest | None = None) -> dict[str, o
 
     wav_path = Path(req.wav_path) if req.wav_path else DEFAULT_WAV_PATH
     if not wav_path.exists():
-        raise HTTPException(status_code=404, detail=f"Arquivo WAV não encontrado: {wav_path}")
+        raise HTTPException(status_code=404, detail=f"Arquivo de áudio não encontrado: {wav_path}")
 
     client_count = await registry.count()
     if client_count:

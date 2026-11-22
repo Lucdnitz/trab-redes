@@ -155,7 +155,7 @@ porta UDP diferente. Para interromper no terminal, use `Ctrl+C`.
 | :--- | :--- |
 | `GET /health` | Status do servidor e quantidade de clientes conectados |
 | `GET /api/v1/session` | Clientes ativos, chave pública Ed25519 e resumo atual |
-| `POST /api/v1/stream/start` | Inicia transmissão de arquivo (padrão `data/reference/aula_redes.wav`) |
+| `POST /api/v1/stream/start` | Inicia transmissão de arquivo (padrão `data/reference/aula tecnologia.mp3`) |
 | `POST /api/v1/stream/upload` | Recebe áudio enviado pelo cliente (`?filename=...&codec=opus`) e transmite |
 | `POST /api/v1/stream/stop` | Interrompe a transmissão ativa |
 | `POST /api/v1/demo/start` | Envia tom PCM de 440 Hz por 3 s para teste rápido de transporte |
