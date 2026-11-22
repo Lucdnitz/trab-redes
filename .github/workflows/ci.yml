@@ -14,5 +14,6 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: python -m pip install -e ".[dev,codec]"
+      - run: bash -n scripts/setup.sh scripts/start-server.sh scripts/start-client.sh scripts/check.sh scripts/run-experiment.sh
       - run: python -m ruff check .
       - run: python -m pytest

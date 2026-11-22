@@ -36,12 +36,13 @@ Cliente desktop PySide6
 
 - Python **3.11 ou 3.12** (`>=3.11,<3.13`)
 - Windows 10/11 ou Linux, com dispositivo de saída de áudio
+- No Linux desktop: PortAudio e bibliotecas gráficas usadas pelo Qt/PySide6
 - Linux ou **WSL2** com `tc` (`iproute2`) para os experimentos com `tc netem`
 - **Opcional (recomendado para o resumo com IA):** Ollama local com o modelo `qwen2.5:1.5b`
 
 ## Instalação (Windows)
 
-### 1. Ambiente do projeto
+### Ambiente do projeto
 
 > **Importante no Windows:** coloque a pasta do projeto em um caminho curto (por exemplo,
 > `C:\trab-redes`) para evitar o limite de 260 caracteres do Windows ao instalar o `PySide6`.
@@ -53,12 +54,36 @@ Cliente desktop PySide6
 O script cria a `.venv` e instala o servidor, o cliente PySide6, IA/codec (`faster-whisper`,
 `av`, `cryptography`, `httpx`), experimentos (`jiwer`, `matplotlib`, `pandas`) e testes.
 
-### 2. Instalar e preparar o Ollama (uma única vez)
+## Instalação (Linux - Ubuntu/Debian)
+
+O servidor funciona em uma máquina Linux sem ambiente gráfico. Para abrir também o cliente
+PySide6 e reproduzir áudio, instale as bibliotecas do Qt e do PortAudio:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv iproute2 libportaudio2 libgl1 libegl1 \
+  libxkbcommon-x11-0 libxcb-cursor0
+```
+
+Em seguida, na raiz do repositório:
+
+```bash
+bash scripts/setup.sh
+```
+
+O script cria `.venv-linux`, atualiza o `pip` e instala os mesmos componentes disponíveis no
+Windows. O ambiente separado evita misturar executáveis Windows e Linux quando o repositório é
+acessado pelo WSL2. Para usar outro local, defina `REDES_VENV=/caminho/do/ambiente`.
+Em outras distribuições, instale os pacotes equivalentes para Python venv, PortAudio, OpenGL/EGL,
+XKB e XCB. O cliente precisa de uma sessão gráfica X11/Wayland e de uma saída PipeWire/PulseAudio
+ou ALSA. O servidor, os testes e os experimentos podem ser executados sem interface gráfica.
+
+## Ollama (opcional - Windows e Linux)
 
 Sem o Ollama, o servidor funciona normalmente usando um resumo extrativo simples em Python.
 Com o Ollama ligado, o resumo é gerado por IA (`ollama:qwen2.5:1.5b`):
 
-1. Instale o Ollama pelo `winget` (ou pelo site oficial):
+No Windows, instale o Ollama pelo `winget` (ou pelo site oficial):
 
 ```powershell
 winget install -e --id Ollama.Ollama
@@ -66,13 +91,22 @@ winget install -e --id Ollama.Ollama
 
 *(Para desinstalar posteriormente: `winget uninstall Ollama.Ollama`.)*
 
-2. Inicie o serviço do Ollama em um terminal (ou abra o aplicativo Ollama):
+No Linux, o instalador oficial é:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Também há instalação manual na [página oficial do Ollama para Linux](https://ollama.com/download/linux).
+Depois da instalação, os comandos de preparação são os mesmos nos dois sistemas.
+
+1. Inicie o serviço do Ollama em um terminal (ou abra o aplicativo no Windows):
 
 ```powershell
 ollama serve
 ```
 
-3. Em outro terminal, baixe o modelo leve `qwen2.5:1.5b` (~1,1 GB, roda em CPU sem GPU):
+2. Em outro terminal, baixe o modelo leve `qwen2.5:1.5b` (~1,1 GB, roda em CPU sem GPU):
 
 ```powershell
 ollama pull qwen2.5:1.5b
@@ -86,13 +120,21 @@ ollama pull hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M
 ollama cp hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M qwen2.5:1.5b
 ```
 
-4. Confirme que o serviço está respondendo na porta `11434`:
+3. Confirme que o serviço está respondendo na porta `11434`.
+
+No PowerShell:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:11434/api/tags
 ```
 
-## Como executar (passo a passo)
+No Linux:
+
+```bash
+curl --fail http://127.0.0.1:11434/api/tags
+```
+
+## Como executar no Windows
 
 - **Terminal 1 (opcional — IA do resumo):**
   ```powershell
@@ -128,6 +170,39 @@ Invoke-RestMethod http://127.0.0.1:11434/api/tags
   Clique em **Simular Adulteração** na janela para enviar uma legenda alterada e confirmar que o
   cliente detecta a assinatura inválida e bloqueia o texto.
 
+## Como executar no Linux
+
+- **Terminal 1 (opcional - IA do resumo):**
+  ```bash
+  ollama serve
+  ```
+  Se o Ollama estiver instalado como serviço e já estiver ativo, não execute outra instância.
+
+- **Terminal 2 (servidor):**
+  ```bash
+  bash scripts/start-server.sh
+  ```
+
+- **Terminal 3 (cliente principal):**
+  ```bash
+  bash scripts/start-client.sh
+  ```
+
+- **Terminal 4 (segundo cliente):**
+  ```bash
+  bash scripts/start-client.sh --udp-port 5002
+  ```
+
+Para conectar um cliente Linux a um servidor em outra máquina, informe o IP acessível na rede:
+
+```bash
+bash scripts/start-client.sh --server 192.168.1.10 --server-port 8000 --udp-port 5001
+```
+
+Libere no firewall do servidor a porta TCP `8000` (HTTP/WebSocket) e, entre servidor e cada
+cliente, a porta UDP informada pelo cliente. Em uma mesma máquina, cada cliente precisa de uma
+porta UDP diferente. Para interromper servidor ou cliente no terminal, use `Ctrl+C`.
+
 ## Endpoints HTTP principais
 
 | Rota | Função |
@@ -150,16 +225,16 @@ Veja `.env.example` para sobrescrever padrões via `.env` ou ambiente:
 - `REDES_SUMMARY_BACKEND` (`auto`, `ollama` ou `extractive`), `REDES_SUMMARY_MIN_CHARS` (`80`)
 - `REDES_OLLAMA_URL` (`http://127.0.0.1:11434`), `REDES_OLLAMA_MODEL` (`qwen2.5:1.5b`)
 
-Se o servidor usar outra porta HTTP/WebSocket, inicie o cliente com
-`-ServerPort <porta>`; a porta UDP continua sendo configurada separadamente.
+Se o servidor usar outra porta HTTP/WebSocket, inicie o cliente com `-ServerPort <porta>` no
+PowerShell ou `--server-port <porta>` no Linux. A porta UDP continua sendo configurada
+separadamente.
 
 ## Experimento obrigatório no Linux / WSL2
 
 No Linux ou WSL2 (com Python 3.11 em ambiente virtual e permissão `sudo` para `tc`):
 
 ```bash
-python experiments/run_matrix.py --wav data/reference/aula_redes_exp.wav
-python experiments/plot_results.py
+bash scripts/run-experiment.sh --wav data/reference/aula_redes_exp.wav
 ```
 
 - Use `--wav data/reference/palestra.mp3` (ou outro arquivo) para avaliar outro áudio.
@@ -191,8 +266,16 @@ gráficos, orçamento de latência, limitações e a resposta à pergunta-desafi
 
 ## Verificar qualidade
 
+No Windows:
+
 ```powershell
 .\scripts\check.ps1
+```
+
+No Linux:
+
+```bash
+bash scripts/check.sh
 ```
 
 Executa o lint (`ruff check .`) e a suíte de 25 testes (`pytest`) sem abrir a interface.
@@ -203,7 +286,7 @@ Executa o lint (`ruff check .`) e a suíte de 25 testes (`pytest`) sem abrir a i
 data/reference/        # áudios de referência e gabaritos para demo e experimento
 docs/                  # decisões de arquitetura
 experiments/           # run_matrix.py, plot_results.py e results/ (ignorado no Git)
-scripts/               # setup, execução e verificação no Windows
+scripts/               # setup, execução e verificação no Windows (.ps1) e Linux (.sh)
 src/redes_audio/
 ├── shared/            # protocolo binário, codec PCM/Opus e assinatura Ed25519
 ├── core/              # jitter buffer e métricas, sem dependência de GUI

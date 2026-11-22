@@ -6,6 +6,7 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .venv/
+.venv-linux/
 venv/
 
 # Environment and local state

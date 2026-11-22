@@ -1,14 +1,17 @@
-"""Gera o relatório final de até seis páginas a partir dos resultados experimentais."""
+"""Gera o relatório final do Projeto 2 em formato acadêmico simples."""
 
 from __future__ import annotations
 
 import csv
 import statistics
 from collections import defaultdict
+from io import BytesIO
 from pathlib import Path
 
+from PIL import Image as PillowImage
+from PIL import ImageOps
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -27,12 +30,11 @@ RESULTS = ROOT / "experiments" / "results"
 CSV_PATH = RESULTS / "results.csv"
 OUTPUT = ROOT / "output" / "pdf" / "relatorio-final-projeto-2-redes.pdf"
 
-NAVY = colors.HexColor("#102A43")
-TEAL = colors.HexColor("#0E7C86")
-LIGHT = colors.HexColor("#EAF4F4")
-PAPER = colors.HexColor("#F7F9FC")
-LINE = colors.HexColor("#CBD5E1")
-MUTED = colors.HexColor("#526D82")
+BLACK = colors.HexColor("#111111")
+DARK_GRAY = colors.HexColor("#333333")
+MID_GRAY = colors.HexColor("#777777")
+LIGHT_GRAY = colors.HexColor("#E6E6E6")
+ROW_GRAY = colors.HexColor("#F4F4F4")
 
 
 def load_rows() -> list[dict[str, str]]:
@@ -61,14 +63,36 @@ def build_styles():
     styles = getSampleStyleSheet()
     styles.add(
         ParagraphStyle(
+            "CoverInstitution",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=11,
+            leading=15,
+            alignment=TA_CENTER,
+            textColor=BLACK,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
             "CoverTitle",
             parent=styles["Title"],
             fontName="Helvetica-Bold",
-            fontSize=24,
-            leading=29,
-            textColor=NAVY,
+            fontSize=19,
+            leading=24,
             alignment=TA_CENTER,
+            textColor=BLACK,
             spaceAfter=10,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            "CoverInfo",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=11,
+            leading=16,
+            alignment=TA_CENTER,
+            textColor=BLACK,
         )
     )
     styles.add(
@@ -76,11 +100,12 @@ def build_styles():
             "Section",
             parent=styles["Heading1"],
             fontName="Helvetica-Bold",
-            fontSize=16,
-            leading=19,
-            textColor=NAVY,
-            spaceBefore=2,
-            spaceAfter=7,
+            fontSize=13,
+            leading=16,
+            textColor=BLACK,
+            spaceBefore=6,
+            spaceAfter=6,
+            keepWithNext=True,
         )
     )
     styles.add(
@@ -88,23 +113,26 @@ def build_styles():
             "Subsection",
             parent=styles["Heading2"],
             fontName="Helvetica-Bold",
-            fontSize=11,
-            leading=14,
-            textColor=TEAL,
+            fontSize=10.5,
+            leading=13,
+            textColor=DARK_GRAY,
             spaceBefore=5,
             spaceAfter=3,
+            keepWithNext=True,
         )
     )
     styles.add(
         ParagraphStyle(
-            "BodyAcademic",
+            "Body",
             parent=styles["BodyText"],
             fontName="Helvetica",
-            fontSize=9.1,
-            leading=12.2,
+            fontSize=9.5,
+            leading=13.2,
             alignment=TA_JUSTIFY,
-            textColor=NAVY,
-            spaceAfter=5,
+            textColor=BLACK,
+            spaceAfter=6,
+            allowWidows=0,
+            allowOrphans=0,
         )
     )
     styles.add(
@@ -112,25 +140,46 @@ def build_styles():
             "Small",
             parent=styles["BodyText"],
             fontName="Helvetica",
-            fontSize=7.7,
-            leading=9.6,
-            textColor=NAVY,
+            fontSize=8,
+            leading=10,
+            alignment=TA_LEFT,
+            textColor=BLACK,
         )
     )
     styles.add(
         ParagraphStyle(
-            "Callout",
+            "TableHeader",
             parent=styles["BodyText"],
             fontName="Helvetica-Bold",
-            fontSize=9,
-            leading=12,
-            textColor=NAVY,
-            backColor=LIGHT,
-            borderColor=TEAL,
-            borderWidth=0.7,
-            borderPadding=7,
-            spaceBefore=5,
+            fontSize=8,
+            leading=10,
+            textColor=colors.white,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            "Caption",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=7.5,
+            leading=9,
+            alignment=TA_CENTER,
+            textColor=DARK_GRAY,
+            spaceBefore=2,
             spaceAfter=6,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            "Reference",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=7.7,
+            leading=9.5,
+            leftIndent=8,
+            firstLineIndent=-8,
+            textColor=BLACK,
+            spaceAfter=3,
         )
     )
     return styles
@@ -139,59 +188,54 @@ def build_styles():
 STYLES = build_styles()
 
 
-def p(text: str, style: str = "BodyAcademic") -> Paragraph:
+def p(text: str, style: str = "Body") -> Paragraph:
     return Paragraph(text, STYLES[style])
 
 
-def table(data, widths, *, header=True, font_size=7.8) -> Table:
-    result = Table(data, colWidths=widths, repeatRows=1 if header else 0, hAlign="LEFT")
+def make_table(data, widths, *, font_size: float = 8) -> Table:
+    normalized = []
+    for row_index, row in enumerate(data):
+        style = STYLES["TableHeader"] if row_index == 0 else STYLES["Small"]
+        normalized.append([Paragraph(str(cell), style) for cell in row])
+
+    result = Table(normalized, colWidths=widths, repeatRows=1, hAlign="LEFT")
     rules = [
-        ("GRID", (0, 0), (-1, -1), 0.35, LINE),
+        ("BACKGROUND", (0, 0), (-1, 0), DARK_GRAY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.35, MID_GRAY),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ("RIGHTPADDING", (0, 0), (-1, -1), 5),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
         ("FONTSIZE", (0, 0), (-1, -1), font_size),
-        ("TEXTCOLOR", (0, 0), (-1, -1), NAVY),
     ]
-    if header:
-        rules += [
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ]
-    for row in range(1 if header else 0, len(data)):
+    for row in range(1, len(data)):
         if row % 2 == 0:
-            rules.append(("BACKGROUND", (0, row), (-1, row), PAPER))
+            rules.append(("BACKGROUND", (0, row), (-1, row), ROW_GRAY))
     result.setStyle(TableStyle(rules))
     return result
 
 
-def footer(canvas, doc) -> None:
-    canvas.saveState()
-    width, _height = A4
-    canvas.setStrokeColor(LINE)
-    canvas.line(20 * mm, 13 * mm, width - 20 * mm, 13 * mm)
-    canvas.setFont("Helvetica", 7.5)
-    canvas.setFillColor(MUTED)
-    canvas.drawString(20 * mm, 8.5 * mm, "Redes de Computadores - UFES - Projeto 2")
-    canvas.drawRightString(width - 20 * mm, 8.5 * mm, f"Página {doc.page} de 6")
-    canvas.restoreState()
+def gray_chart(filename: str, *, width: float = 154 * mm, max_height: float = 58 * mm) -> Image:
+    source = RESULTS / filename
+    if not source.exists():
+        raise FileNotFoundError(source)
 
+    with PillowImage.open(source) as original:
+        grayscale = ImageOps.grayscale(original).convert("RGB")
+        pixel_width, pixel_height = grayscale.size
+        buffer = BytesIO()
+        grayscale.save(buffer, format="PNG", optimize=True)
+    buffer.seek(0)
 
-def chart_pair(left: str, right: str, *, height: float = 62 * mm) -> Table:
-    items = []
-    for name in (left, right):
-        path = RESULTS / name
-        if not path.exists():
-            raise FileNotFoundError(path)
-        image = Image(str(path), width=82 * mm, height=height)
-        items.append(image)
-    result = Table([items], colWidths=[86 * mm, 86 * mm])
-    result.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
-    return result
+    height = width * pixel_height / pixel_width
+    if height > max_height:
+        height = max_height
+        width = height * pixel_width / pixel_height
+    chart = Image(buffer, width=width, height=height, hAlign="CENTER")
+    chart._source_buffer = buffer  # mantém o stream vivo até a construção do PDF
+    return chart
 
 
 def grouped(rows: list[dict[str, str]]) -> dict[tuple[str, int], list[dict[str, str]]]:
@@ -201,137 +245,192 @@ def grouped(rows: list[dict[str, str]]) -> dict[tuple[str, int], list[dict[str, 
     return groups
 
 
+def first_page(canvas, _doc) -> None:
+    canvas.saveState()
+    width, _height = A4
+    canvas.setStrokeColor(DARK_GRAY)
+    canvas.setLineWidth(0.7)
+    canvas.line(28 * mm, 18 * mm, width - 28 * mm, 18 * mm)
+    canvas.restoreState()
+
+
+def later_pages(canvas, doc) -> None:
+    canvas.saveState()
+    width, _height = A4
+    canvas.setStrokeColor(LIGHT_GRAY)
+    canvas.line(20 * mm, 14 * mm, width - 20 * mm, 14 * mm)
+    canvas.setFillColor(MID_GRAY)
+    canvas.setFont("Helvetica", 7.5)
+    canvas.drawString(20 * mm, 9.5 * mm, "Redes de Computadores - Projeto 2")
+    canvas.drawRightString(width - 20 * mm, 9.5 * mm, f"Página {doc.page}")
+    canvas.restoreState()
+
+
 def build_story(rows: list[dict[str, str]]) -> list:
     groups = grouped(rows)
     duration = number(rows[0], "duration_s")
-    pcm_20 = groups[("PCM", 20)]
-    opus_20 = groups[("OPUS", 20)]
-    clean_gt = mean(groups[("PCM", 0)], "wer_vs_gt")
+    pcm_rows = [row for row in rows if row["codec"] == "PCM"]
+    opus_rows = [row for row in rows if row["codec"] == "OPUS"]
+    bandwidth_reduction = 100 * (
+        1 - mean(opus_rows, "bandwidth_kbps") / mean(pcm_rows, "bandwidth_kbps")
+    )
 
-    story = [Spacer(1, 18 * mm)]
+    story = [Spacer(1, 30 * mm)]
     story += [
-        p("UNIVERSIDADE FEDERAL DO ESPÍRITO SANTO", "Subsection"),
-        p("Centro Tecnológico - Departamento de Informática", "Small"),
-        Spacer(1, 18 * mm),
-        p("Áudio ao vivo com transcrição,<br/>resumo incremental e integridade", "CoverTitle"),
-        p("Projeto 2 - Redes de Computadores", "Section"),
-        Spacer(1, 8 * mm),
-        p("Lucas D'Amato Nitz e Victor Dutra", "Callout"),
-        p("Professor: Magnos Martinello<br/>Entrega: 22 de novembro de 2026", "Small"),
-        Spacer(1, 18 * mm),
-        p("RESUMO", "Subsection"),
+        p("UNIVERSIDADE FEDERAL DO ESPÍRITO SANTO", "CoverInstitution"),
+        p("Centro Tecnológico - Departamento de Informática", "CoverInstitution"),
+        p("Disciplina de Redes de Computadores", "CoverInstitution"),
+        Spacer(1, 30 * mm),
+        p("RELATÓRIO FINAL - PROJETO 2", "CoverTitle"),
         p(
-            "Este trabalho implementa um serviço cliente-servidor para áudio ao vivo. O áudio "
-            "é segmentado em quadros de 20 ms e transmitido por UDP com sequência, timestamp e "
-            "codec; legendas e controle usam WebSocket. O cliente desktop mantém jitter buffer "
-            "configurável, reprodução e métricas de perda, atraso e banda.",
+            "Áudio ao vivo com transcrição,<br/>resumo incremental e integridade de legendas",
+            "CoverTitle",
+        ),
+        Spacer(1, 24 * mm),
+        p("Lucas D'Amato Nitz<br/>Victor Dutra", "CoverInfo"),
+        Spacer(1, 14 * mm),
+        p("Professor: Magnos Martinello", "CoverInfo"),
+        Spacer(1, 34 * mm),
+        p("Vitória - ES<br/>2026", "CoverInfo"),
+    ]
+    story.append(PageBreak())
+
+    story += [p("1. Introdução", "Section")]
+    story += [
+        p(
+            "O projeto consiste em um sistema cliente-servidor para transmissão de áudio ao vivo. "
+            "O servidor envia o áudio por UDP para um ou mais clientes, enquanto legendas, resumo e "
+            "mensagens de controle são enviados por WebSocket. A proposta permite observar, na prática, "
+            "como perda de pacotes, atraso e escolha de codec afetam uma aplicação de tempo real."
         ),
         p(
-            "A dupla desenvolveu dois incrementos: resumo ao vivo para entrada tardia e "
-            "assinatura Ed25519 de cada legenda. O experimento aplica cinco taxas de perda com "
-            "tc netem, compara PCM e Opus em 30 execuções e mede WER, banda e latência.",
+            "A implementação foi feita em Python. O servidor usa FastAPI e o cliente possui interface "
+            "desktop em PySide6. Foram implementados os codecs PCM e Opus, um jitter buffer para "
+            "reordenar pacotes e uma transcrição feita no servidor. Como incrementos, o sistema também "
+            "gera um resumo durante a transmissão e assina as legendas com Ed25519."
+        ),
+        p("1.1 Objetivos", "Subsection"),
+        p(
+            "O objetivo principal foi desenvolver uma solução funcional que reunisse conceitos de "
+            "redes e programação concorrente. Além de transmitir o áudio, queríamos medir o que acontece "
+            "quando a rede perde pacotes e comparar o custo de banda dos dois codecs."
+        ),
+        make_table(
+            [
+                ["Item", "O que foi implementado"],
+                ["Transporte", "Áudio por UDP; controle, legendas e resumo por WebSocket"],
+                ["Clientes", "Vários ouvintes simultâneos, cada um com sua porta UDP"],
+                ["Áudio", "PCM e Opus em quadros de 20 ms"],
+                ["Transcrição", "Whisper executado no servidor"],
+                ["Incrementos", "Resumo incremental e assinatura Ed25519"],
+            ],
+            [37 * mm, 136 * mm],
+        ),
+        p("Tabela 1 - Visão geral dos recursos entregues.", "Caption"),
+        p("2. Arquitetura da solução", "Section"),
+        p(
+            "O fluxo de áudio e o fluxo de texto foram separados porque possuem necessidades diferentes. "
+            "Para o áudio, uma retransmissão pode chegar tarde demais e causar mais atraso; por isso foi "
+            "usado UDP. Já as legendas e os comandos precisam chegar em ordem, o que justifica o uso do "
+            "WebSocket sobre TCP."
+        ),
+        make_table(
+            [
+                ["Canal", "Conteúdo", "Motivo da escolha"],
+                ["UDP", "Quadros PCM ou Opus", "Baixa latência e perda observável"],
+                ["WebSocket", "Legendas, resumo, chave e eventos", "Entrega ordenada e confiável"],
+                ["HTTP", "Início, parada, sessão e upload", "Operações simples do servidor"],
+            ],
+            [30 * mm, 65 * mm, 78 * mm],
+        ),
+        p("Tabela 2 - Canais usados pela aplicação.", "Caption"),
+    ]
+    story.append(PageBreak())
+
+    story += [p("3. Principais escolhas de implementação", "Section")]
+    story += [
+        p("3.1 Pacotes e jitter buffer", "Subsection"),
+        p(
+            "Cada datagrama de áudio possui identificação do protocolo, versão, codec, número de "
+            "sequência, timestamp em amostras e tamanho do payload. O formato foi inspirado no RTP, "
+            "mas reduzido ao necessário para o trabalho. O número de sequência permite detectar perda, "
+            "duplicação e chegada fora de ordem."
         ),
         p(
-            "Hipótese: o aumento da perda elevará o WER; Opus reduzirá a banda, enquanto a "
-            "qualidade sob perda dependerá da decodificação e do padrão de pacotes descartados.",
-            "Callout",
+            "No cliente, o jitter buffer espera uma pequena quantidade inicial de pacotes antes de "
+            "começar a reprodução. Depois disso, libera um quadro a cada 20 ms. Quando um pacote não "
+            "chega a tempo, o cliente insere silêncio naquele trecho e mantém a linha temporal."
+        ),
+        p("3.2 Concorrência", "Subsection"),
+        p(
+            "A interface, a recepção da rede e a reprodução não executam na mesma tarefa. O cliente usa "
+            "workers separados para evitar que a janela congele enquanto recebe ou toca áudio. No "
+            "servidor, transmissão, transcrição e resumo também são separados. Assim, uma chamada lenta "
+            "ao modelo de resumo não interrompe o envio UDP."
+        ),
+        p("3.3 Transcrição, resumo e integridade", "Subsection"),
+        p(
+            "O Whisper recebe o áudio limpo no servidor e envia as legendas aos clientes. O resumo usa "
+            "Ollama quando o serviço está disponível. Caso contrário, o servidor usa um resumo extrativo "
+            "local, o que permite demonstrar o projeto mesmo sem o modelo instalado."
+        ),
+        p(
+            "As legendas finalizadas são assinadas com Ed25519. O cliente verifica a assinatura antes "
+            "de exibir o texto e sinaliza alterações. Há um comando de demonstração que modifica uma "
+            "legenda para comprovar que a verificação está funcionando."
+        ),
+        p("3.4 Organização do código", "Subsection"),
+        make_table(
+            [
+                ["Pasta", "Responsabilidade"],
+                ["shared", "Protocolo, codecs, carregamento de áudio e assinatura"],
+                ["core", "Jitter buffer e métricas"],
+                ["server", "APIs, registro de clientes, transmissão, Whisper e resumo"],
+                ["client", "Rede, reprodução e interface PySide6"],
+                ["experiments", "Matriz de testes, CSV e geração dos gráficos"],
+            ],
+            [38 * mm, 135 * mm],
+        ),
+        p("Tabela 3 - Divisão dos módulos do projeto.", "Caption"),
+        p("3.5 Tratamento de erros e testes", "Subsection"),
+        p(
+            "O código valida cabeçalhos e tamanhos de payload, descarta duplicatas, registra pacotes "
+            "atrasados e encerra os workers de forma controlada. O experimento remove a regra do netem "
+            "mesmo se ocorrer erro. O projeto possui 25 testes automatizados e verificação com Ruff. "
+            "Também foram adicionados scripts equivalentes para Windows e Linux."
         ),
     ]
     story.append(PageBreak())
 
-    story += [p("1. Arquitetura e núcleo obrigatório", "Section")]
+    story += [p("4. Experimento", "Section")]
     story += [
         p(
-            "O projeto separa tráfego sensível a atraso do tráfego sensível a perda. UDP não "
-            "retransmite áudio atrasado; WebSocket preserva a ordem de legendas, resumos e "
-            "controles. O servidor envia o mesmo fluxo para múltiplos endpoints registrados.",
+            f"Foi usado um áudio de referência em português com {pt(duration)} segundos, mono e 16 kHz. "
+            "O mesmo áudio foi transmitido em PCM e Opus com perdas configuradas de 0%, 1%, 5%, 10% e "
+            "20%. Cada combinação foi repetida três vezes, totalizando 30 execuções."
         ),
-        table(
-            [
-                ["Fluxo", "Transporte", "Conteúdo", "Propriedade"],
-                ["Áudio", "UDP", "PCM/Opus + sequência + timestamp", "Baixa latência; perda observável"],
-                ["Texto", "WebSocket/TCP", "Legenda, resumo e assinatura", "Ordenado e confiável"],
-                ["Controle", "HTTP/WebSocket", "Iniciar, pausar localmente e parar", "Estado explícito"],
-            ],
-            [25 * mm, 30 * mm, 67 * mm, 50 * mm],
-        ),
-        p("Cabeçalho estilo RTP", "Subsection"),
-        table(
-            [
-                ["Campo", "Formato", "Função"],
-                ["magic/version", "2 B + uint8", "Identificação e evolução do protocolo"],
-                ["codec", "uint8", "PCM=1; Opus=2"],
-                ["sequence", "uint32", "Ordenação e detecção de perda"],
-                ["timestamp_samples", "uint64", "Sincronização entre áudio e legenda"],
-                ["payload_len", "uint16", "Validação do datagrama"],
-            ],
-            [42 * mm, 38 * mm, 92 * mm],
-        ),
-        p("Jitter buffer e concorrência", "Subsection"),
         p(
-            "O receptor aguarda o prefill configurado, reordena por sequência e avança um "
-            "quadro a cada 20 ms. Uma lacuna ocupa silêncio no instante correto, preservando a "
-            "linha do tempo. Rede, reprodução e interface executam em workers distintos; ASR e "
-            "resumo rodam fora do caminho crítico do UDP.",
+            "A perda foi aplicada com tc netem na interface de loopback do WSL2. Depois de cada execução, "
+            "o áudio recebido foi reconstruído e transcrito. A comparação principal usa o WER, que mede "
+            "substituições, exclusões e inserções de palavras em relação à transcrição do áudio sem perda."
         ),
-        p("Incrementos da dupla", "Subsection"),
-        table(
+        make_table(
             [
-                ["Trilha", "Implementação", "Demonstração"],
-                ["Inteligência", "Resumo incremental com Ollama e fallback extrativo", "Cliente tardio recebe o último resumo"],
-                ["Segurança", "Ed25519 sobre sessão, sequência, tempo e texto", "Legenda modificada é rejeitada"],
+                ["Configuração", "Valor"],
+                ["Codecs", "PCM e Opus"],
+                ["Perda configurada", "0%, 1%, 5%, 10% e 20%"],
+                ["Repetições", "3 por condição"],
+                ["Total", "30 execuções"],
+                ["Quadro de áudio", "20 ms"],
+                ["Jitter buffer", "100 ms"],
+                ["Métricas", "WER, perda observada, banda e latência"],
             ],
-            [34 * mm, 82 * mm, 56 * mm],
+            [54 * mm, 119 * mm],
         ),
+        p("Tabela 4 - Configuração do experimento.", "Caption"),
+        p("4.1 Resultados numéricos", "Subsection"),
     ]
-    story.append(PageBreak())
-
-    story += [p("2. Metodologia experimental", "Section")]
-    story += [
-        p(
-            f"Foi usado um áudio de referência em português com {pt(duration)} s, mono, 16 kHz "
-            "e 16 bits. Para cada codec foram configuradas perdas de 0%, 1%, 5%, 10% e 20%, "
-            "com três repetições por condição. O qdisc netem foi instalado na interface "
-            "loopback do WSL2 e removido ao final, inclusive em caso de erro.",
-        ),
-        table(
-            [
-                ["Elemento", "Definição"],
-                ["Variável independente", "Perda configurada no tc netem e codec PCM/Opus"],
-                ["Variáveis controladas", "Mesmo áudio, 20 ms, 16 kHz, jitter de 100 ms e Whisper tiny/int8"],
-                ["Repetições", "3 por combinação; 30 execuções totais"],
-                ["Métrica principal", "WER da transcrição recebida contra a transcrição do áudio limpo"],
-                ["Métricas auxiliares", "Perda observada, banda e orçamento de latência"],
-            ],
-            [48 * mm, 124 * mm],
-        ),
-        p("Pipeline de cada execução", "Subsection"),
-        p(
-            "codificar quadro → empacotar → enviar por UDP → aplicar netem → reordenar no jitter "
-            "buffer → substituir lacunas por silêncio → decodificar → reconstruir WAV → "
-            "transcrever no cliente → calcular WER e salvar CSV.",
-            "Callout",
-        ),
-        p("Validade da comparação", "Subsection"),
-        p(
-            "O WAV reconstruído conserva exatamente a duração original, inclusive quando os "
-            "primeiros ou últimos pacotes se perdem. A referência principal é a transcrição "
-            "Whisper do áudio limpo, isolando o efeito da rede. O WER contra o texto humano "
-            f"também foi registrado; no áudio limpo ele foi {pt(clean_gt * 100, 1)}%, mostrando "
-            "que erros próprios do modelo não devem ser atribuídos ao transporte.",
-        ),
-        p("Reprodutibilidade", "Subsection"),
-        p(
-            "O repositório inclui áudio, texto de referência, runner, CSV incremental, metadados "
-            "do ambiente e gerador dos gráficos. A largura de banda inclui cabeçalhos IPv4/UDP. "
-            "A latência combina valores medidos e parâmetros declarados; não é apresentada como "
-            "uma medição de Internet pública.",
-        ),
-    ]
-    story.append(PageBreak())
-
-    story += [p("3. Resultados: perda e qualidade", "Section")]
-    result_table = [["Codec", "Perda cfg.", "Perda obs. média", "WER médio", "Desvio WER"]]
+    result_table = [["Codec", "Perda", "Perda observada", "WER médio", "Desvio do WER"]]
     for codec in ("PCM", "OPUS"):
         for loss in (0, 1, 5, 10, 20):
             subset = groups[(codec, loss)]
@@ -345,103 +444,70 @@ def build_story(rows: list[dict[str, str]]) -> list:
                 ]
             )
     story += [
-        table(result_table, [25 * mm, 30 * mm, 42 * mm, 34 * mm, 41 * mm], font_size=7.3),
-        Spacer(1, 5),
-        chart_pair("wer_vs_loss.png", "loss_validation.png", height=58 * mm),
+        make_table(result_table, [25 * mm, 25 * mm, 42 * mm, 39 * mm, 42 * mm], font_size=7.5),
+        p("Tabela 5 - Médias das três repetições de cada condição.", "Caption"),
         p(
-            "A curva observada deve ser interpretada com as barras de desvio: netem descarta "
-            "pacotes de modo probabilístico, e cada repetição recebe um padrão distinto. A "
-            f"20%, o WER médio foi {pt(mean(pcm_20, 'wer') * 100)}% em PCM e "
-            f"{pt(mean(opus_20, 'wer') * 100)}% em Opus. Assim, os dados sustentam a hipótese "
-            "de degradação da transcrição conforme a perda aumenta.",
+            "A perda observada ficou próxima do valor configurado. As pequenas diferenças são esperadas, "
+            "pois o netem descarta pacotes de forma probabilística. Sem perda, a transcrição reconstruída "
+            "foi igual à referência limpa."
         ),
     ]
     story.append(PageBreak())
 
-    story += [p("4. Resultados: banda e latência", "Section")]
-    codec_rows = [["Codec", "Banda média", "Codificação", "ASR computação", "Total até legenda"]]
-    for codec in ("PCM", "OPUS"):
-        subset = [row for row in rows if row["codec"] == codec]
-        codec_rows.append(
-            [
-                codec,
-                f"{pt(mean(subset, 'bandwidth_kbps'), 1)} kbps",
-                f"{pt(mean(subset, 'capture_to_send_ms'))} ms",
-                f"{pt(mean(subset, 'transcription_ms'))} ms",
-                f"{pt(mean(subset, 'total_ms'))} ms",
-            ]
-        )
+    story += [p("5. Análise dos resultados", "Section")]
     story += [
-        chart_pair("bandwidth_comparison.png", "latency_budget.png", height=59 * mm),
-        Spacer(1, 5),
-        table(codec_rows, [27 * mm, 38 * mm, 36 * mm, 36 * mm, 35 * mm]),
-        p("Orçamento de latência", "Subsection"),
+        gray_chart("wer_vs_loss.png", max_height=61 * mm),
+        p("Figura 1 - Taxa de erro de palavras em função da perda de pacotes.", "Caption"),
         p(
-            "O orçamento soma: formação do quadro e codificação; trânsito UDP; 100 ms de jitter "
-            "buffer; decodificação; 1 s para acumular uma janela de ASR; processamento Whisper; "
-            "retorno textual pelo enlace, usado como proxy local; e 16,67 ms para atualização em "
-            "uma tela de 60 Hz. Os componentes configurados aparecem separados dos medidos no CSV.",
+            "O WER aumentou à medida que a perda cresceu. Em 20% de perda, o valor médio foi de "
+            f"{pt(mean(groups[('PCM', 20)], 'wer') * 100)}% para PCM e "
+            f"{pt(mean(groups[('OPUS', 20)], 'wer') * 100)}% para Opus. Isso mostra que a perda de "
+            "quadros prejudica a transcrição, mesmo quando a reprodução mantém a duração correta."
         ),
+        gray_chart("loss_validation.png", max_height=61 * mm),
+        p("Figura 2 - Comparação entre a perda configurada e a perda observada.", "Caption"),
         p(
-            "PCM mantém aproximadamente 256 kbps de payload antes dos cabeçalhos. Opus reduz "
-            "fortemente a banda porque explora redundância temporal, ao custo de codificação e "
-            "dependência entre quadros. A janela de fala domina a latência; otimizar apenas a rede "
-            "não elimina esse atraso.",
-            "Callout",
+            "O gráfico também confirma que o ambiente de teste aplicou as perdas esperadas. Como foram "
+            "feitas somente três repetições por condição e usado um único áudio, os valores servem para "
+            "avaliar este sistema, não para estabelecer uma comparação geral entre todos os codecs."
         ),
     ]
     story.append(PageBreak())
 
-    story += [p("5. Pergunta-desafio e conclusão", "Section")]
+    story += [p("5.1 Banda e latência", "Section")]
     story += [
-        p("Onde a transcrição deve rodar?", "Subsection"),
+        gray_chart("bandwidth_comparison.png", max_height=50 * mm),
+        p("Figura 3 - Consumo médio de banda dos codecs.", "Caption"),
         p(
-            "Os dados favorecem a transcrição no servidor para o serviço principal. No servidor, "
-            "o Whisper recebe áudio limpo uma única vez e distribui texto leve a todos os clientes. "
-            "No cliente, o WER cresce com as perdas medidas e cada ouvinte consome CPU e memória "
-            "para executar o modelo. Quanto maior o número de ouvintes, maior a vantagem de "
-            "centralizar o ASR.",
+            f"PCM consumiu em média {pt(mean(pcm_rows, 'bandwidth_kbps'), 1)} kbps, enquanto Opus "
+            f"consumiu {pt(mean(opus_rows, 'bandwidth_kbps'), 1)} kbps. A redução foi de "
+            f"{pt(bandwidth_reduction, 1)}%, o que torna o Opus mais adequado quando a banda é limitada."
         ),
-        table(
-            [
-                ["Critério", "Servidor - áudio limpo", "Cliente - áudio recebido"],
-                ["Qualidade", "Independente da perda após o servidor", "Varia com perda, jitter e codec"],
-                ["Latência", "ASR único + WebSocket", "Jitter + ASR em cada máquina"],
-                ["Banda", "Áudio + texto pequeno", "Somente áudio, mas sem economia relevante de rede"],
-                ["Privacidade", "Áudio é processado centralmente", "Pode manter processamento no dispositivo"],
-                ["Escala", "Modelo compartilhado; servidor dimensionável", "Custo replicado em todos os clientes"],
-            ],
-            [29 * mm, 71 * mm, 72 * mm],
-            font_size=7.4,
+        gray_chart("latency_budget.png", max_height=50 * mm),
+        p("Figura 4 - Componentes do orçamento de latência.", "Caption"),
+        p(
+            "A maior parte da latência vem da janela acumulada para transcrição e do processamento do "
+            "Whisper. O transporte UDP e a codificação representam uma parcela menor. Portanto, reduzir "
+            "apenas o atraso da rede não seria suficiente para tornar a legenda imediata."
+        ),
+        p("6. Conclusão", "Section"),
+        p(
+            "Para este projeto, a melhor escolha é executar a transcrição no servidor. O servidor recebe "
+            "o áudio antes das perdas que afetam cada cliente e executa o Whisper uma única vez. Se a "
+            "transcrição fosse feita nos clientes, cada máquina teria um resultado diferente e repetiria "
+            "o mesmo custo de processamento."
         ),
         p(
-            "Recomendação: transcrever no servidor e enviar legendas assinadas por WebSocket. A "
-            "transcrição no cliente permanece útil quando privacidade local é requisito superior "
-            "à qualidade uniforme ou quando o servidor não deve receber áudio em claro.",
-            "Callout",
-        ),
-        p("Limitações", "Subsection"),
-        p(
-            "O experimento usa loopback WSL2 e um único áudio sintético; os resultados não "
-            "representam todos os sotaques ou enlaces. A chave Ed25519 chega pelo próprio "
-            "WebSocket, assumido autêntico; TLS ou pinagem seriam necessários contra substituição "
-            "ativa da chave. O orçamento de tela é um limite de agendamento, não instrumentação "
-            "do hardware gráfico.",
-        ),
-        p("Conclusão", "Subsection"),
-        p(
-            "O núcleo demonstra a diferença entre UDP e transporte confiável, o papel do jitter "
-            "buffer e o efeito mensurável da perda. Os incrementos de Inteligência e Segurança "
-            "operam fora do caminho crítico. As 30 execuções, com repetição e gráficos, permitem "
-            "responder a pergunta conceitual usando evidências do próprio sistema.",
+            "O trabalho permitiu aplicar UDP, TCP/WebSocket, concorrência, codecs, jitter buffer e "
+            "medições de rede em uma solução completa. Os testes mostraram o aumento do WER com a perda "
+            "e a economia de banda obtida com Opus. Como melhorias futuras, seria interessante testar "
+            "mais vozes, redes reais, perdas em rajada e medir a latência ponta a ponta com instrumentação."
         ),
         p("Referências", "Subsection"),
-        p(
-            "[1] MARTINELLO, M. Projetos de Redes de Computadores - Propostas de Trabalho, 2026. "
-            "[2] KUROSE, J. F.; ROSS, K. W. Redes de computadores e a Internet: uma abordagem "
-            "top-down. Pearson, 2013. [3] Código, dados e scripts reproduzíveis do repositório da dupla.",
-            "Small",
-        ),
+        p("[1] KUROSE, J. F.; ROSS, K. W. <i>Computer Networking: A Top-Down Approach</i>. 8. ed. Pearson, 2021.", "Reference"),
+        p("[2] SCHULZRINNE, H. et al. <i>RTP: A Transport Protocol for Real-Time Applications</i>. RFC 3550, 2003.", "Reference"),
+        p("[3] VALIN, J.-M.; VOS, K.; TERRIBERRY, T. <i>Definition of the Opus Audio Codec</i>. RFC 6716, 2012.", "Reference"),
+        p("[4] RADFORD, A. et al. Robust Speech Recognition via Large-Scale Weak Supervision. ICML, 2023.", "Reference"),
     ]
     return story
 
@@ -450,6 +516,7 @@ def main() -> None:
     rows = load_rows()
     if len(rows) != 30:
         raise RuntimeError(f"expected 30 experiment rows, found {len(rows)}")
+
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     document = SimpleDocTemplate(
         str(OUTPUT),
@@ -457,12 +524,12 @@ def main() -> None:
         leftMargin=20 * mm,
         rightMargin=20 * mm,
         topMargin=18 * mm,
-        bottomMargin=18 * mm,
-        title="Relatório final - Projeto 2 de Redes",
+        bottomMargin=19 * mm,
+        title="Relatório Final - Projeto 2 de Redes",
         author="Lucas D'Amato Nitz e Victor Dutra",
-        subject="Áudio ao vivo com transcrição, resumo incremental e integridade",
+        subject="Áudio ao vivo com transcrição, resumo e integridade de legendas",
     )
-    document.build(build_story(rows), onFirstPage=footer, onLaterPages=footer)
+    document.build(build_story(rows), onFirstPage=first_page, onLaterPages=later_pages)
     print(OUTPUT)
 
 

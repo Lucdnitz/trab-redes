@@ -2,8 +2,9 @@
 
 ## Preparação
 
-1. Executar `scripts/check.ps1`.
-2. Iniciar o servidor com `scripts/start-server.ps1`.
+1. Executar `scripts/check.ps1` no Windows ou `bash scripts/check.sh` no Linux.
+2. Iniciar o servidor com `scripts/start-server.ps1` no Windows ou
+   `bash scripts/start-server.sh` no Linux.
 3. Abrir dois clientes nas portas UDP 5001 e 5002.
 4. Confirmar que o áudio de referência e os quatro gráficos estão presentes.
 5. Deixar o Ollama ativo; se ele não responder, explicar o fallback extrativo.
@@ -37,3 +38,5 @@
 - Sem Ollama: usar o fallback extrativo e mostrar o backend no painel.
 - Sem modelo Whisper já baixado: usar o cache preparado antes da apresentação.
 - Porta 8000 ocupada: iniciar o servidor em outra `REDES_PORT` e passar `-ServerPort` ao cliente.
+- Linux sem áudio: confirmar `libportaudio2`, a saída PipeWire/PulseAudio/ALSA e a sessão gráfica;
+  o servidor e os testes continuam funcionando sem GUI.
