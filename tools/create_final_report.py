@@ -5,11 +5,8 @@ from __future__ import annotations
 import csv
 import statistics
 from collections import defaultdict
-from io import BytesIO
 from pathlib import Path
 
-from PIL import Image as PillowImage
-from PIL import ImageOps
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -35,6 +32,8 @@ DARK_GRAY = colors.HexColor("#333333")
 MID_GRAY = colors.HexColor("#777777")
 LIGHT_GRAY = colors.HexColor("#E6E6E6")
 ROW_GRAY = colors.HexColor("#F4F4F4")
+ACCENT = colors.HexColor("#1F4E79")
+LIGHT_ACCENT = colors.HexColor("#EAF2F8")
 
 
 def load_rows() -> list[dict[str, str]]:
@@ -69,7 +68,7 @@ def build_styles():
             fontSize=11,
             leading=15,
             alignment=TA_CENTER,
-            textColor=BLACK,
+            textColor=ACCENT,
         )
     )
     styles.add(
@@ -80,7 +79,7 @@ def build_styles():
             fontSize=19,
             leading=24,
             alignment=TA_CENTER,
-            textColor=BLACK,
+            textColor=ACCENT,
             spaceAfter=10,
         )
     )
@@ -102,7 +101,7 @@ def build_styles():
             fontName="Helvetica-Bold",
             fontSize=13,
             leading=16,
-            textColor=BLACK,
+            textColor=ACCENT,
             spaceBefore=6,
             spaceAfter=6,
             keepWithNext=True,
@@ -115,7 +114,7 @@ def build_styles():
             fontName="Helvetica-Bold",
             fontSize=10.5,
             leading=13,
-            textColor=DARK_GRAY,
+            textColor=ACCENT,
             spaceBefore=5,
             spaceAfter=3,
             keepWithNext=True,
@@ -169,19 +168,6 @@ def build_styles():
             spaceAfter=6,
         )
     )
-    styles.add(
-        ParagraphStyle(
-            "Reference",
-            parent=styles["BodyText"],
-            fontName="Helvetica",
-            fontSize=7.7,
-            leading=9.5,
-            leftIndent=8,
-            firstLineIndent=-8,
-            textColor=BLACK,
-            spaceAfter=3,
-        )
-    )
     return styles
 
 
@@ -200,7 +186,7 @@ def make_table(data, widths, *, font_size: float = 8) -> Table:
 
     result = Table(normalized, colWidths=widths, repeatRows=1, hAlign="LEFT")
     rules = [
-        ("BACKGROUND", (0, 0), (-1, 0), DARK_GRAY),
+        ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("GRID", (0, 0), (-1, -1), 0.35, MID_GRAY),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -212,29 +198,23 @@ def make_table(data, widths, *, font_size: float = 8) -> Table:
     ]
     for row in range(1, len(data)):
         if row % 2 == 0:
-            rules.append(("BACKGROUND", (0, row), (-1, row), ROW_GRAY))
+            rules.append(("BACKGROUND", (0, row), (-1, row), LIGHT_ACCENT))
     result.setStyle(TableStyle(rules))
     return result
 
 
-def gray_chart(filename: str, *, width: float = 154 * mm, max_height: float = 58 * mm) -> Image:
+def chart_image(filename: str, *, width: float = 154 * mm, max_height: float = 58 * mm) -> Image:
     source = RESULTS / filename
     if not source.exists():
         raise FileNotFoundError(source)
 
-    with PillowImage.open(source) as original:
-        grayscale = ImageOps.grayscale(original).convert("RGB")
-        pixel_width, pixel_height = grayscale.size
-        buffer = BytesIO()
-        grayscale.save(buffer, format="PNG", optimize=True)
-    buffer.seek(0)
-
-    height = width * pixel_height / pixel_width
+    chart = Image(str(source), hAlign="CENTER")
+    height = width * chart.imageHeight / chart.imageWidth
     if height > max_height:
         height = max_height
-        width = height * pixel_width / pixel_height
-    chart = Image(buffer, width=width, height=height, hAlign="CENTER")
-    chart._source_buffer = buffer  # mantém o stream vivo até a construção do PDF
+        width = height * chart.imageWidth / chart.imageHeight
+    chart.drawWidth = width
+    chart.drawHeight = height
     return chart
 
 
@@ -456,7 +436,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
 
     story += [p("5. Análise dos resultados", "Section")]
     story += [
-        gray_chart("wer_vs_loss.png", max_height=61 * mm),
+        chart_image("wer_vs_loss.png", max_height=61 * mm),
         p("Figura 1: Taxa de erro de palavras em função da perda de pacotes.", "Caption"),
         p(
             "O WER aumentou à medida que a perda cresceu. Em 20% de perda, o valor médio foi de "
@@ -464,7 +444,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
             f"{pt(mean(groups[('OPUS', 20)], 'wer') * 100)}% para Opus. Isso mostra que a perda de "
             "quadros prejudica a transcrição, mesmo quando a reprodução mantém a duração correta."
         ),
-        gray_chart("loss_validation.png", max_height=61 * mm),
+        chart_image("loss_validation.png", max_height=61 * mm),
         p("Figura 2: Comparação entre a perda configurada e a perda observada.", "Caption"),
         p(
             "O gráfico também confirma que o ambiente de teste aplicou as perdas esperadas. Como foram "
@@ -476,14 +456,14 @@ def build_story(rows: list[dict[str, str]]) -> list:
 
     story += [p("5.1 Banda e latência", "Section")]
     story += [
-        gray_chart("bandwidth_comparison.png", max_height=50 * mm),
+        chart_image("bandwidth_comparison.png", max_height=50 * mm),
         p("Figura 3: Consumo médio de banda dos codecs.", "Caption"),
         p(
             f"PCM consumiu em média {pt(mean(pcm_rows, 'bandwidth_kbps'), 1)} kbps, enquanto Opus "
             f"consumiu {pt(mean(opus_rows, 'bandwidth_kbps'), 1)} kbps. A redução foi de "
             f"{pt(bandwidth_reduction, 1)}%, o que torna o Opus mais adequado quando a banda é limitada."
         ),
-        gray_chart("latency_budget.png", max_height=50 * mm),
+        chart_image("latency_budget.png", max_height=50 * mm),
         p("Figura 4: Componentes do orçamento de latência.", "Caption"),
         p(
             "A maior parte da latência vem da janela acumulada para transcrição e do processamento do "
@@ -503,11 +483,12 @@ def build_story(rows: list[dict[str, str]]) -> list:
             "e a economia de banda obtida com Opus. Como melhorias futuras, seria interessante testar "
             "mais vozes, redes reais, perdas em rajada e medir a latência ponta a ponta com instrumentação."
         ),
-        p("Referências", "Subsection"),
-        p("[1] KUROSE, J. F. e ROSS, K. W. <i>Computer Networking: A Top Down Approach</i>. 8. ed. Pearson, 2021.", "Reference"),
-        p("[2] SCHULZRINNE, H. et al. <i>RTP: A Transport Protocol for Real Time Applications</i>. RFC 3550, 2003.", "Reference"),
-        p("[3] VALIN, J. M., VOS, K. e TERRIBERRY, T. <i>Definition of the Opus Audio Codec</i>. RFC 6716, 2012.", "Reference"),
-        p("[4] RADFORD, A. et al. Robust Speech Recognition via Large Scale Weak Supervision. ICML, 2023.", "Reference"),
+        p("Código fonte", "Subsection"),
+        p(
+            "O código do servidor, do cliente, os testes e os dados do experimento estão disponíveis "
+            "no <link href='https://github.com/Lucdnitz/trab-redes' color='#1F4E79'>"
+            "<u>repositório do projeto no GitHub</u></link>."
+        ),
     ]
     return story
 
