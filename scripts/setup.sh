@@ -68,7 +68,12 @@ else
     done
 fi
 
-if [[ -n "${python_command}" ]]; then
+if [[ -x "${venv_path}/bin/python" ]] && is_supported_python "${venv_path}/bin/python"; then
+    python_exe="${venv_path}/bin/python"
+    echo "Reutilizando ambiente compatível em ${venv_path}..."
+    "${python_exe}" -m pip install --upgrade pip
+    "${python_exe}" -m pip install -e "${project_root}[client,ai,experiments,dev]"
+elif [[ -n "${python_command}" ]]; then
     if [[ -x "${venv_path}/bin/python" ]] && ! is_supported_python "${venv_path}/bin/python"; then
         echo "Recriando ${venv_path} com ${python_command}..."
         rm -rf "${venv_path}"

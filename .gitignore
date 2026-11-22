@@ -25,6 +25,9 @@ experiments/results/wav/
 build/
 dist/
 *.spec
+docs/
+output/
+tools/
 
 # Editors and operating systems
 .idea/
