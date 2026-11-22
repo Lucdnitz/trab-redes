@@ -91,15 +91,28 @@ def plot_all(csv_path: Path, out_dir: Path) -> None:
     plt.close(fig)
 
     # 4. Orçamento de latência (PCM vs Opus)
-    fig, ax = plt.subplots(figsize=(7.2, 4.4))
+    fig, ax = plt.subplots(figsize=(8.6, 4.4))
     lat = df.groupby("codec")[
-        ["capture_to_send_ms", "network_ms", "buffer_ms", "transcription_ms"]
+        [
+            "capture_to_send_ms",
+            "network_ms",
+            "buffer_ms",
+            "decode_ms",
+            "asr_window_ms",
+            "transcription_ms",
+            "text_delivery_ms",
+            "display_budget_ms",
+        ]
     ].mean().reindex(["PCM", "OPUS"])
     components = [
         ("capture_to_send_ms", "Captura + codificação", "#0E7C86"),
         ("network_ms", "Rede UDP", "#3B82F6"),
         ("buffer_ms", "Jitter buffer", "#F59E0B"),
-        ("transcription_ms", "Processamento ASR (janela 4s)", "#EF4444"),
+        ("decode_ms", "Decodificação", "#8B5CF6"),
+        ("asr_window_ms", "Acúmulo para ASR (1 s)", "#EC4899"),
+        ("transcription_ms", "Processamento ASR", "#EF4444"),
+        ("text_delivery_ms", "Canal de texto (proxy)", "#10B981"),
+        ("display_budget_ms", "Atualização da tela (60 Hz)", "#64748B"),
     ]
     bottom = pd.Series([0.0, 0.0], index=lat.index)
     for col, label, color in components:
@@ -110,8 +123,8 @@ def plot_all(csv_path: Path, out_dir: Path) -> None:
     ax.set_title("Orçamento de latência de processamento até a legenda")
     ax.set_ylabel("Latência (ms)")
     ax.set_ylim(0, max(bottom) * 1.18)
-    ax.legend(loc="upper right")
-    fig.tight_layout()
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, borderaxespad=0)
+    fig.tight_layout(rect=[0, 0, 0.76, 1])
     fig.savefig(out_dir / "latency_budget.png", dpi=180)
     plt.close(fig)
 

@@ -8,6 +8,15 @@ from redes_audio.server.registry import ClientEndpoint, ClientRegistry
 from redes_audio.shared.protocol import AudioCodec, AudioPacket
 
 
+class RecordingRegistry(ClientRegistry):
+    def __init__(self) -> None:
+        super().__init__()
+        self.events: list[dict] = []
+
+    async def broadcast_json(self, payload: dict) -> None:
+        self.events.append(payload)
+
+
 @pytest.mark.asyncio
 async def test_broadcaster_sends_decodable_pcm_packet() -> None:
     receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -31,3 +40,17 @@ async def test_broadcaster_sends_decodable_pcm_packet() -> None:
     finally:
         await stream_task
         receiver.close()
+
+
+@pytest.mark.asyncio
+async def test_managed_demo_emits_end_event_when_stopped() -> None:
+    registry = RecordingRegistry()
+    broadcaster = AudioBroadcaster(registry, sample_rate=16_000, frame_ms=20)
+
+    task = await broadcaster.start_demo_background(duration_seconds=1.0)
+    await asyncio.sleep(0.03)
+    await broadcaster.stop_active_stream()
+
+    assert task.cancelled()
+    assert [event["type"] for event in registry.events] == ["stream_started", "stream_ended"]
+    assert broadcaster.is_streaming() is False

@@ -9,6 +9,7 @@ from PySide6.QtCore import QThread, Signal
 
 from redes_audio.core.jitter_buffer import JitterBuffer
 from redes_audio.shared.codec import FrameDecoder
+from redes_audio.shared.protocol import AudioCodec
 
 
 class PlaybackWorker(QThread):
@@ -30,6 +31,7 @@ class PlaybackWorker(QThread):
         self._frame_bytes = self.samples_per_frame * 2
         self._max_ring_bytes = self._frame_bytes * 15
         self._decoder = FrameDecoder(sample_rate=sample_rate, frame_ms=frame_ms)
+        self._active_codec: AudioCodec | None = None
         self._ring = bytearray()
         self._ring_lock = Lock()
         self._primed = False
@@ -39,6 +41,7 @@ class PlaybackWorker(QThread):
     def reset_stream(self) -> None:
         """Limpa o estado do decodificador e do anel ao iniciar nova transmissão."""
         self._decoder = FrameDecoder(sample_rate=self.sample_rate, frame_ms=self.frame_ms)
+        self._active_codec = None
         with self._ring_lock:
             self._ring.clear()
             self._primed = False
@@ -95,14 +98,19 @@ class PlaybackWorker(QThread):
 
                     # Só consome do jitter buffer se o anel de saída ainda tiver folga.
                     if ring_bytes < self._max_ring_bytes:
-                        packet = self.buffer.pop_next()
+                        packet, missing = self.buffer.pop_next_with_status()
                         if packet is not None:
+                            self._active_codec = packet.codec
                             pcm = self._decoder.decode(packet.codec, packet.payload)
                             with self._ring_lock:
                                 self._ring.extend(pcm)
                             emitted_counter += 1
                             if emitted_counter % 10 == 0:
                                 self.position_changed.emit(packet.timestamp_samples)
+                        elif missing:
+                            pcm = self._decoder.conceal_loss(self._active_codec)
+                            with self._ring_lock:
+                                self._ring.extend(pcm)
 
                     next_tick += frame_interval
                     sleep_s = next_tick - time.perf_counter()

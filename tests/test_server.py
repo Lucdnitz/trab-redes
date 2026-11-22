@@ -1,3 +1,5 @@
+import socket
+
 from fastapi.testclient import TestClient
 
 from redes_audio.server.app import app
@@ -49,3 +51,33 @@ def test_upload_rejects_empty_body() -> None:
         )
 
     assert response.status_code == 400
+
+
+def test_stream_sends_control_events_and_udp_packet() -> None:
+    receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    receiver.bind(("127.0.0.1", 0))
+    receiver.settimeout(2.0)
+    udp_port = receiver.getsockname()[1]
+
+    try:
+        with TestClient(app, client=("127.0.0.1", 50_000)) as client, client.websocket_connect(
+            "/ws"
+        ) as websocket:
+            websocket.send_json({"type": "register", "udp_port": udp_port})
+            assert websocket.receive_json()["type"] == "registered"
+
+            response = client.post(
+                "/api/v1/stream/start",
+                json={"codec": "pcm", "enable_transcription": False},
+            )
+            assert response.status_code == 202
+            assert response.json()["accepted"] is True
+            assert websocket.receive_json()["type"] == "stream_started"
+
+            datagram, _address = receiver.recvfrom(2_048)
+            assert datagram.startswith(b"RA")
+
+            assert client.post("/api/v1/stream/stop").status_code == 200
+            assert websocket.receive_json()["type"] == "stream_ended"
+    finally:
+        receiver.close()

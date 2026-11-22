@@ -6,63 +6,16 @@ import asyncio
 import math
 import socket
 import uuid
-import wave
 from array import array
 from pathlib import Path
 
 from redes_audio.server.registry import ClientRegistry
 from redes_audio.server.summary import SummaryEngine, TranscriptSegment
 from redes_audio.server.transcription import LocalTranscriber, StreamingTranscriptionBuffer
+from redes_audio.shared.audio import load_pcm_frames
 from redes_audio.shared.codec import FrameEncoder
 from redes_audio.shared.protocol import AudioCodec, AudioPacket
 from redes_audio.shared.signing import TranscriptSigner
-
-
-def load_pcm_frames_from_wav(
-    audio_path: Path,
-    *,
-    sample_rate: int = 16_000,
-    frame_ms: int = 20,
-) -> list[bytes]:
-    """Lê qualquer arquivo de áudio (WAV, MP3, M4A, OGG) e devolve quadros PCM 16 kHz mono."""
-    frame_bytes = sample_rate * frame_ms // 1000 * 2
-
-    if audio_path.suffix.lower() == ".wav":
-        with wave.open(str(audio_path), "rb") as wf:
-            if (
-                wf.getnchannels() == 1
-                and wf.getsampwidth() == 2
-                and wf.getframerate() == sample_rate
-            ):
-                raw_pcm = wf.readframes(wf.getnframes())
-            else:
-                raw_pcm = _resample_audio_file(audio_path, sample_rate)
-    else:
-        raw_pcm = _resample_audio_file(audio_path, sample_rate)
-
-    if not raw_pcm:
-        return []
-
-    remainder = len(raw_pcm) % frame_bytes
-    if remainder:
-        raw_pcm += bytes(frame_bytes - remainder)
-
-    return [raw_pcm[i : i + frame_bytes] for i in range(0, len(raw_pcm), frame_bytes)]
-
-
-def _resample_audio_file(path: Path, sample_rate: int) -> bytes:
-    import av
-    import numpy as np
-
-    resampler = av.AudioResampler(format="s16", layout="mono", rate=sample_rate)
-    chunks: list[bytes] = []
-    with av.open(str(path)) as container:
-        for frame in container.decode(audio=0):
-            for out_frame in resampler.resample(frame):
-                chunks.append(out_frame.to_ndarray().astype(np.int16, copy=False).tobytes())
-        for out_frame in resampler.resample(None):
-            chunks.append(out_frame.to_ndarray().astype(np.int16, copy=False).tobytes())
-    return b"".join(chunks)
 
 
 class AudioBroadcaster:
@@ -133,6 +86,24 @@ class AudioBroadcaster:
             )
             return self._active_task
 
+    async def start_demo_background(
+        self,
+        *,
+        duration_seconds: float = 3.0,
+        frequency: int = 440,
+    ) -> asyncio.Task[int]:
+        """Inicia o tom pelo mesmo controlador que impede transmissões concorrentes."""
+        async with self._control_lock:
+            await self._stop_active_locked()
+            self._stop_requested = False
+            self._active_task = asyncio.create_task(
+                self.stream_demo_tone(
+                    duration_seconds=duration_seconds,
+                    frequency=frequency,
+                )
+            )
+            return self._active_task
+
     async def stream_demo_tone(self, *, duration_seconds: float = 3.0, frequency: int = 440) -> int:
         """Envia um tom PCM em tempo real para todos os clientes registrados."""
         total_frames = int(duration_seconds * 1000 / self.frame_ms)
@@ -163,7 +134,7 @@ class AudioBroadcaster:
     ) -> int:
         """Lê um arquivo de áudio e transmite quadro a quadro via UDP."""
         frames = await asyncio.to_thread(
-            load_pcm_frames_from_wav,
+            load_pcm_frames,
             wav_path,
             sample_rate=self.sample_rate,
             frame_ms=self.frame_ms,
@@ -261,7 +232,11 @@ class AudioBroadcaster:
 
                     clients = await self.registry.snapshot()
                     for client in clients:
-                        sock.sendto(packet, (client.host, client.udp_port))
+                        try:
+                            sock.sendto(packet, (client.host, client.udp_port))
+                        except OSError:
+                            # Um endpoint inválido não pode interromper os demais ouvintes.
+                            continue
 
                 if asr_buffer is not None and asr_event is not None:
                     if asr_buffer.push_pcm(pcm_frame):
@@ -291,8 +266,6 @@ class AudioBroadcaster:
                     await summary_task
                 except asyncio.CancelledError:
                     pass
-
-        if not self._stop_requested:
             await self.registry.broadcast_json(
                 {"type": "stream_ended", "session_id": self.session_id}
             )

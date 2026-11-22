@@ -9,6 +9,7 @@ import sys
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Cliente desktop do Projeto 2 de Redes")
     parser.add_argument("--server", default="127.0.0.1", help="IP ou hostname do servidor")
+    parser.add_argument("--server-port", default=8000, type=int, help="porta HTTP/WebSocket")
     parser.add_argument("--udp-port", default=5001, type=int, help="porta UDP local")
     return parser
 
@@ -24,7 +25,7 @@ def main() -> None:
     args = build_parser().parse_args()
     app = QApplication(sys.argv)
     app.setApplicationName("Redes Audio Live")
-    window = MainWindow(args.server, args.udp_port)
+    window = MainWindow(args.server, args.server_port, args.udp_port)
     window.show()
     raise SystemExit(app.exec())
 

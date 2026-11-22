@@ -33,7 +33,7 @@ from redes_audio.shared.signing import TranscriptVerifier
 class MainWindow(QMainWindow):
     _control_feedback = Signal(str)
 
-    def __init__(self, server_host: str, udp_port: int) -> None:
+    def __init__(self, server_host: str, server_port: int, udp_port: int) -> None:
         super().__init__()
         self.setWindowTitle("Projeto 2 - Áudio ao vivo")
         self.resize(980, 660)
@@ -51,6 +51,9 @@ class MainWindow(QMainWindow):
         self._pending_captions: list[dict] = []
 
         self.server_input = QLineEdit(server_host)
+        self.server_port_input = QSpinBox()
+        self.server_port_input.setRange(1, 65_535)
+        self.server_port_input.setValue(server_port)
         self.udp_port_input = QSpinBox()
         self.udp_port_input.setRange(1_024, 65_535)
         self.udp_port_input.setValue(udp_port)
@@ -141,6 +144,7 @@ class MainWindow(QMainWindow):
         connection_group = QGroupBox("Conexão")
         connection_form = QFormLayout(connection_group)
         connection_form.addRow("Servidor", self.server_input)
+        connection_form.addRow("Porta HTTP/WS", self.server_port_input)
         connection_form.addRow("Porta UDP", self.udp_port_input)
         connection_form.addRow("Jitter buffer (ms)", self.jitter_input)
         connection_form.addRow("Estado", self.status_label)
@@ -206,6 +210,7 @@ class MainWindow(QMainWindow):
         self.buffer = JitterBuffer(prefill_frames=prefill, max_frames=max(50, prefill * 5))
         self.network_worker = NetworkWorker(
             self.server_input.text().strip(),
+            self.server_port_input.value(),
             self.udp_port_input.value(),
             self.buffer,
         )
@@ -260,6 +265,8 @@ class MainWindow(QMainWindow):
             self.summary_meta_label.setText("Resumo: aguardando conteúdo suficiente")
             self._active_codec = str(event.get("codec", "-"))
             self.metric_labels["codec"].setText(self._active_codec)
+            if self.buffer is not None:
+                self.buffer.reset()
             if self.playback_worker is not None:
                 self.playback_worker.reset_stream()
             if event.get("public_key"):
@@ -373,7 +380,7 @@ class MainWindow(QMainWindow):
         audio_path = Path(selected)
         codec = self.upload_codec_combo.currentText().lower()
         host = self.server_input.text().strip() or "127.0.0.1"
-        url = f"http://{host}:8000/api/v1/stream/upload"
+        url = f"http://{host}:{self.server_port_input.value()}/api/v1/stream/upload"
 
         def _worker() -> None:
             try:
@@ -393,7 +400,7 @@ class MainWindow(QMainWindow):
 
     def _call_server(self, path: str, body: dict | None) -> None:
         host = self.server_input.text().strip() or "127.0.0.1"
-        url = f"http://{host}:8000{path}"
+        url = f"http://{host}:{self.server_port_input.value()}{path}"
 
         def _worker() -> None:
             try:

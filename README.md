@@ -144,11 +144,14 @@ Invoke-RestMethod http://127.0.0.1:11434/api/tags
 
 Veja `.env.example` para sobrescrever padrões via `.env` ou ambiente:
 
-- `REDES_HOST` (`0.0.0.0`), `REDES_PORT` (`8000`), `REDES_DEFAULT_JITTER_MS` (`100`)
+- `REDES_HOST` (`0.0.0.0`), `REDES_PORT` (`8000`)
 - `REDES_SAMPLE_RATE` (`16000`), `REDES_FRAME_DURATION_MS` (`20`)
 - `REDES_WHISPER_MODEL` (`base`), `REDES_WHISPER_LANGUAGE` (`pt`), `REDES_TRANSCRIPTION_WINDOW_SECONDS` (`1.5`)
 - `REDES_SUMMARY_BACKEND` (`auto`, `ollama` ou `extractive`), `REDES_SUMMARY_MIN_CHARS` (`80`)
 - `REDES_OLLAMA_URL` (`http://127.0.0.1:11434`), `REDES_OLLAMA_MODEL` (`qwen2.5:1.5b`)
+
+Se o servidor usar outra porta HTTP/WebSocket, inicie o cliente com
+`-ServerPort <porta>`; a porta UDP continua sendo configurada separadamente.
 
 ## Experimento obrigatório no Linux / WSL2
 
@@ -166,13 +169,33 @@ python experiments/plot_results.py
 - O plotter gera 4 gráficos PNG em `experiments/results/`: `wer_vs_loss.png`,
   `bandwidth_comparison.png`, `loss_validation.png` e `latency_budget.png`.
 
+### Resultados obtidos
+
+A matriz completa de 30 execuções foi realizada no WSL2 com `tc netem` real e Whisper
+`tiny/int8`. Os arquivos reproduzíveis estão em `experiments/results/`.
+
+| Codec | Perda | Perda observada média | WER médio |
+| --- | ---: | ---: | ---: |
+| PCM | 0% | 0,00% | 0,00% |
+| PCM | 5% | 5,13% | 7,84% |
+| PCM | 10% | 9,20% | 13,72% |
+| PCM | 20% | 19,64% | 30,72% |
+| Opus | 0% | 0,00% | 0,00% |
+| Opus | 5% | 4,84% | 9,15% |
+| Opus | 10% | 10,13% | 29,41% |
+| Opus | 20% | 19,85% | 34,64% |
+
+Na média de todas as condições, PCM consumiu 255,4 kbps e Opus 36,5 kbps, incluindo
+cabeçalhos. O relatório final em `output/pdf/relatorio-final-projeto-2-redes.pdf` apresenta
+gráficos, orçamento de latência, limitações e a resposta à pergunta-desafio.
+
 ## Verificar qualidade
 
 ```powershell
 .\scripts\check.ps1
 ```
 
-Executa o lint (`ruff check .`) e a suíte de 20 testes (`pytest`) sem abrir a interface.
+Executa o lint (`ruff check .`) e a suíte de 25 testes (`pytest`) sem abrir a interface.
 
 ## Estrutura
 

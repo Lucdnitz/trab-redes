@@ -51,3 +51,28 @@ def test_rearms_after_idle_and_accepts_restarted_stream() -> None:
     assert buffer.push(packet(0)) is True
     assert buffer.push(packet(1)) is True
     assert buffer.pop_next().sequence == 0
+
+
+def test_known_initial_sequence_preserves_a_loss_at_the_start() -> None:
+    buffer = JitterBuffer(prefill_frames=2, max_frames=10, initial_sequence=0)
+    buffer.push(packet(1))
+    buffer.push(packet(2))
+
+    first, missing = buffer.pop_next_with_status()
+    assert first is None
+    assert missing is True
+    assert buffer.metrics().lost == 1
+    assert buffer.pop_next().sequence == 1
+
+
+def test_reset_accepts_immediate_sequence_restart() -> None:
+    buffer = JitterBuffer(prefill_frames=2, max_frames=10)
+    buffer.push(packet(10))
+    buffer.push(packet(11))
+    assert buffer.pop_next().sequence == 10
+
+    buffer.reset()
+    buffer.push(packet(0))
+    buffer.push(packet(1))
+    assert buffer.pop_next().sequence == 0
+    assert buffer.metrics().late == 0

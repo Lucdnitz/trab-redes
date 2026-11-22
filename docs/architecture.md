@@ -31,7 +31,7 @@ O formato inicial é PCM signed 16-bit little-endian, mono, 16 kHz e quadros de 
 - thread principal: somente PySide6 e reação a sinais;
 - worker de rede: UDP e WebSocket;
 - worker de reprodução: consumo periódico do jitter buffer;
-- tarefas futuras de ASR/resumo: servidor, fora do caminho crítico do áudio.
+- tarefas de ASR/resumo: servidor, fora do caminho crítico do áudio.
 
 ## Resumo incremental
 
@@ -45,5 +45,19 @@ reprodução ou envio de legendas.
 
 ## Modo headless
 
-Os experimentos reutilizarão `AudioPacket` e `JitterBuffer`. A única diferença será a saída:
-em vez de dispositivo de áudio e widgets, o runner gravará WAV e CSV.
+Os experimentos reutilizam `AudioPacket`, codecs e `JitterBuffer`. A única diferença é a
+saída: em vez de dispositivo de áudio e widgets, o runner grava WAV e CSV.
+
+## Integridade e modelo de ameaça
+
+Cada legenda final é assinada com Ed25519 sobre sessão, sequência, intervalo temporal e
+texto. O cliente rejeita qualquer alteração posterior a essa assinatura. A chave pública é
+recebida no canal WebSocket; portanto, a demonstração assume que esse primeiro canal é
+autêntico. A solução detecta adulteração em trânsito após a distribuição da chave, mas não
+pretende substituir TLS nem autenticação do servidor.
+
+## Troca de transmissão
+
+Somente uma transmissão pode ficar ativa. Iniciar outro arquivo ou tom cancela o anterior,
+emite `stream_ended`, zera o jitter buffer e inicia uma nova sessão a partir da sequência zero.
+Uma lacuna após o prefill ocupa um quadro de silêncio, preservando timestamps e sincronização.

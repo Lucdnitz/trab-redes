@@ -34,9 +34,16 @@ class NetworkWorker(QThread):
     metrics_changed = Signal(dict)
     error = Signal(str)
 
-    def __init__(self, server_host: str, udp_port: int, buffer: JitterBuffer) -> None:
+    def __init__(
+        self,
+        server_host: str,
+        server_port: int,
+        udp_port: int,
+        buffer: JitterBuffer,
+    ) -> None:
         super().__init__()
         self.server_host = server_host
+        self.server_port = server_port
         self.udp_port = udp_port
         self.buffer = buffer
         self._stop_event = Event()
@@ -55,7 +62,7 @@ class NetworkWorker(QThread):
             local_addr=("0.0.0.0", self.udp_port),
         )
 
-        uri = f"ws://{self.server_host}:8000/ws"
+        uri = f"ws://{self.server_host}:{self.server_port}/ws"
         try:
             async with connect(uri) as websocket:
                 await websocket.send(json.dumps({"type": "register", "udp_port": self.udp_port}))

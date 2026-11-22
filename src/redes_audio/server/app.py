@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
 from contextlib import asynccontextmanager
@@ -107,7 +106,7 @@ async def session_status() -> dict[str, object]:
 async def start_demo() -> dict[str, object]:
     client_count = await registry.count()
     if client_count:
-        asyncio.create_task(broadcaster.stream_demo_tone())
+        await broadcaster.start_demo_background()
     return {"accepted": bool(client_count), "clients": client_count}
 
 

@@ -150,3 +150,9 @@ class FrameDecoder:
                 self._opus = OpusDecoder(sample_rate=self.sample_rate, frame_ms=self.frame_ms)
             return self._opus.decode(payload)
         return bytes(self._frame_bytes)
+
+    def conceal_loss(self, codec: AudioCodec | None) -> bytes:
+        """Mantém um quadro de 20 ms na linha do tempo quando o datagrama se perde."""
+        if codec is AudioCodec.OPUS and self._opus is not None:
+            return self._opus.decode_loss()
+        return bytes(self._frame_bytes)

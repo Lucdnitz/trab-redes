@@ -43,3 +43,4 @@ def test_opus_codec_compresses_and_decodes_to_fixed_frame_size() -> None:
         assert len(decoded) == len(pcm) == 640
 
     assert max(encoded_sizes) < 200
+    assert len(decoder.conceal_loss(AudioCodec.OPUS)) == 640

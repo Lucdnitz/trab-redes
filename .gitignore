@@ -13,7 +13,11 @@ venv/
 *.local
 logs/
 data/generated/
-experiments/results/
+experiments/results/*
+!experiments/results/results.csv
+!experiments/results/metadata.json
+!experiments/results/*.png
+experiments/results/wav/
 
 # Packaging
 build/

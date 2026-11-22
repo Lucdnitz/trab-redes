@@ -37,6 +37,7 @@ class JitterBuffer:
         prefill_frames: int = 5,
         max_frames: int = 50,
         idle_rearm_frames: int = 25,
+        initial_sequence: int | None = None,
     ) -> None:
         if prefill_frames < 1:
             raise ValueError("prefill_frames must be positive")
@@ -44,10 +45,13 @@ class JitterBuffer:
             raise ValueError("max_frames must be greater than or equal to prefill_frames")
         if idle_rearm_frames < 1:
             raise ValueError("idle_rearm_frames must be positive")
+        if initial_sequence is not None and initial_sequence < 0:
+            raise ValueError("initial_sequence cannot be negative")
 
         self.prefill_frames = prefill_frames
         self.max_frames = max_frames
         self.idle_rearm_frames = idle_rearm_frames
+        self.initial_sequence = initial_sequence
         self._packets: dict[int, AudioPacket] = {}
         self._expected_sequence: int | None = None
         self._started = False
@@ -95,11 +99,25 @@ class JitterBuffer:
 
     def pop_next(self) -> AudioPacket | None:
         """Entrega o próximo quadro ou `None` em espera/perda."""
+        packet, _missing = self.pop_next_with_status()
+        return packet
+
+    def pop_next_with_status(self) -> tuple[AudioPacket | None, bool]:
+        """Entrega `(pacote, perda_no_instante)` para preservar a linha do tempo.
+
+        O segundo valor diferencia uma lacuna após o início da reprodução da espera pelo
+        preenchimento inicial. Isso permite ao reprodutor inserir silêncio no instante exato
+        do pacote perdido, sem transformar a perda em aceleração do áudio.
+        """
         with self._lock:
             if not self._started:
                 if len(self._packets) < self.prefill_frames:
-                    return None
-                self._expected_sequence = min(self._packets)
+                    return None, False
+                self._expected_sequence = (
+                    self.initial_sequence
+                    if self.initial_sequence is not None
+                    else min(self._packets)
+                )
                 self._started = True
                 self._idle_gaps = 0
                 self._pending_empty_losses = 0
@@ -114,20 +132,21 @@ class JitterBuffer:
                     self._idle_gaps = 0
                     self._metrics.lost += 1 + self._pending_empty_losses
                     self._pending_empty_losses = 0
-                    return None
+                    return None, True
 
                 self._idle_gaps += 1
                 if self._idle_gaps >= self.idle_rearm_frames:
                     self._started = False
                     self._idle_gaps = 0
                     self._pending_empty_losses = 0
+                    return None, False
                 else:
                     self._pending_empty_losses += 1
-                return None
+                return None, True
 
             self._idle_gaps = 0
             self._metrics.played += 1
-            return packet
+            return packet, False
 
     def rearm(self) -> None:
         """Descarta fila atual para ressincronizar ao vivo sem zerar métricas."""
