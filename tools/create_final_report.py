@@ -261,7 +261,7 @@ def later_pages(canvas, doc) -> None:
     canvas.line(20 * mm, 14 * mm, width - 20 * mm, 14 * mm)
     canvas.setFillColor(MID_GRAY)
     canvas.setFont("Helvetica", 7.5)
-    canvas.drawString(20 * mm, 9.5 * mm, "Redes de Computadores - Projeto 2")
+    canvas.drawString(20 * mm, 9.5 * mm, "Redes de Computadores, Projeto 2")
     canvas.drawRightString(width - 20 * mm, 9.5 * mm, f"Página {doc.page}")
     canvas.restoreState()
 
@@ -278,10 +278,10 @@ def build_story(rows: list[dict[str, str]]) -> list:
     story = [Spacer(1, 30 * mm)]
     story += [
         p("UNIVERSIDADE FEDERAL DO ESPÍRITO SANTO", "CoverInstitution"),
-        p("Centro Tecnológico - Departamento de Informática", "CoverInstitution"),
+        p("Centro Tecnológico, Departamento de Informática", "CoverInstitution"),
         p("Disciplina de Redes de Computadores", "CoverInstitution"),
         Spacer(1, 30 * mm),
-        p("RELATÓRIO FINAL - PROJETO 2", "CoverTitle"),
+        p("RELATÓRIO FINAL DO PROJETO 2", "CoverTitle"),
         p(
             "Áudio ao vivo com transcrição,<br/>resumo incremental e integridade de legendas",
             "CoverTitle",
@@ -291,14 +291,14 @@ def build_story(rows: list[dict[str, str]]) -> list:
         Spacer(1, 14 * mm),
         p("Professor: Magnos Martinello", "CoverInfo"),
         Spacer(1, 34 * mm),
-        p("Vitória - ES<br/>2026", "CoverInfo"),
+        p("Vitória, ES<br/>2026", "CoverInfo"),
     ]
     story.append(PageBreak())
 
     story += [p("1. Introdução", "Section")]
     story += [
         p(
-            "O projeto consiste em um sistema cliente-servidor para transmissão de áudio ao vivo. "
+            "O projeto consiste em um sistema de comunicação entre cliente e servidor para transmissão de áudio ao vivo. "
             "O servidor envia o áudio por UDP para um ou mais clientes, enquanto legendas, resumo e "
             "mensagens de controle são enviados por WebSocket. A proposta permite observar, na prática, "
             "como perda de pacotes, atraso e escolha de codec afetam uma aplicação de tempo real."
@@ -318,7 +318,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
         make_table(
             [
                 ["Item", "O que foi implementado"],
-                ["Transporte", "Áudio por UDP; controle, legendas e resumo por WebSocket"],
+                ["Transporte", "Áudio por UDP, controle, legendas e resumo por WebSocket"],
                 ["Clientes", "Vários ouvintes simultâneos, cada um com sua porta UDP"],
                 ["Áudio", "PCM e Opus em quadros de 20 ms"],
                 ["Transcrição", "Whisper executado no servidor"],
@@ -326,11 +326,11 @@ def build_story(rows: list[dict[str, str]]) -> list:
             ],
             [37 * mm, 136 * mm],
         ),
-        p("Tabela 1 - Visão geral dos recursos entregues.", "Caption"),
+        p("Tabela 1: Visão geral dos recursos entregues.", "Caption"),
         p("2. Arquitetura da solução", "Section"),
         p(
             "O fluxo de áudio e o fluxo de texto foram separados porque possuem necessidades diferentes. "
-            "Para o áudio, uma retransmissão pode chegar tarde demais e causar mais atraso; por isso foi "
+            "Para o áudio, uma retransmissão pode chegar tarde demais e causar mais atraso. Por isso foi "
             "usado UDP. Já as legendas e os comandos precisam chegar em ordem, o que justifica o uso do "
             "WebSocket sobre TCP."
         ),
@@ -343,7 +343,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
             ],
             [30 * mm, 65 * mm, 78 * mm],
         ),
-        p("Tabela 2 - Canais usados pela aplicação.", "Caption"),
+        p("Tabela 2: Canais usados pela aplicação.", "Caption"),
     ]
     story.append(PageBreak())
 
@@ -391,7 +391,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
             ],
             [38 * mm, 135 * mm],
         ),
-        p("Tabela 3 - Divisão dos módulos do projeto.", "Caption"),
+        p("Tabela 3: Divisão dos módulos do projeto.", "Caption"),
         p("3.5 Tratamento de erros e testes", "Subsection"),
         p(
             "O código valida cabeçalhos e tamanhos de payload, descarta duplicatas, registra pacotes "
@@ -427,7 +427,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
             ],
             [54 * mm, 119 * mm],
         ),
-        p("Tabela 4 - Configuração do experimento.", "Caption"),
+        p("Tabela 4: Configuração do experimento.", "Caption"),
         p("4.1 Resultados numéricos", "Subsection"),
     ]
     result_table = [["Codec", "Perda", "Perda observada", "WER médio", "Desvio do WER"]]
@@ -445,7 +445,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
             )
     story += [
         make_table(result_table, [25 * mm, 25 * mm, 42 * mm, 39 * mm, 42 * mm], font_size=7.5),
-        p("Tabela 5 - Médias das três repetições de cada condição.", "Caption"),
+        p("Tabela 5: Médias das três repetições de cada condição.", "Caption"),
         p(
             "A perda observada ficou próxima do valor configurado. As pequenas diferenças são esperadas, "
             "pois o netem descarta pacotes de forma probabilística. Sem perda, a transcrição reconstruída "
@@ -457,7 +457,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
     story += [p("5. Análise dos resultados", "Section")]
     story += [
         gray_chart("wer_vs_loss.png", max_height=61 * mm),
-        p("Figura 1 - Taxa de erro de palavras em função da perda de pacotes.", "Caption"),
+        p("Figura 1: Taxa de erro de palavras em função da perda de pacotes.", "Caption"),
         p(
             "O WER aumentou à medida que a perda cresceu. Em 20% de perda, o valor médio foi de "
             f"{pt(mean(groups[('PCM', 20)], 'wer') * 100)}% para PCM e "
@@ -465,7 +465,7 @@ def build_story(rows: list[dict[str, str]]) -> list:
             "quadros prejudica a transcrição, mesmo quando a reprodução mantém a duração correta."
         ),
         gray_chart("loss_validation.png", max_height=61 * mm),
-        p("Figura 2 - Comparação entre a perda configurada e a perda observada.", "Caption"),
+        p("Figura 2: Comparação entre a perda configurada e a perda observada.", "Caption"),
         p(
             "O gráfico também confirma que o ambiente de teste aplicou as perdas esperadas. Como foram "
             "feitas somente três repetições por condição e usado um único áudio, os valores servem para "
@@ -477,14 +477,14 @@ def build_story(rows: list[dict[str, str]]) -> list:
     story += [p("5.1 Banda e latência", "Section")]
     story += [
         gray_chart("bandwidth_comparison.png", max_height=50 * mm),
-        p("Figura 3 - Consumo médio de banda dos codecs.", "Caption"),
+        p("Figura 3: Consumo médio de banda dos codecs.", "Caption"),
         p(
             f"PCM consumiu em média {pt(mean(pcm_rows, 'bandwidth_kbps'), 1)} kbps, enquanto Opus "
             f"consumiu {pt(mean(opus_rows, 'bandwidth_kbps'), 1)} kbps. A redução foi de "
             f"{pt(bandwidth_reduction, 1)}%, o que torna o Opus mais adequado quando a banda é limitada."
         ),
         gray_chart("latency_budget.png", max_height=50 * mm),
-        p("Figura 4 - Componentes do orçamento de latência.", "Caption"),
+        p("Figura 4: Componentes do orçamento de latência.", "Caption"),
         p(
             "A maior parte da latência vem da janela acumulada para transcrição e do processamento do "
             "Whisper. O transporte UDP e a codificação representam uma parcela menor. Portanto, reduzir "
@@ -504,10 +504,10 @@ def build_story(rows: list[dict[str, str]]) -> list:
             "mais vozes, redes reais, perdas em rajada e medir a latência ponta a ponta com instrumentação."
         ),
         p("Referências", "Subsection"),
-        p("[1] KUROSE, J. F.; ROSS, K. W. <i>Computer Networking: A Top-Down Approach</i>. 8. ed. Pearson, 2021.", "Reference"),
-        p("[2] SCHULZRINNE, H. et al. <i>RTP: A Transport Protocol for Real-Time Applications</i>. RFC 3550, 2003.", "Reference"),
-        p("[3] VALIN, J.-M.; VOS, K.; TERRIBERRY, T. <i>Definition of the Opus Audio Codec</i>. RFC 6716, 2012.", "Reference"),
-        p("[4] RADFORD, A. et al. Robust Speech Recognition via Large-Scale Weak Supervision. ICML, 2023.", "Reference"),
+        p("[1] KUROSE, J. F. e ROSS, K. W. <i>Computer Networking: A Top Down Approach</i>. 8. ed. Pearson, 2021.", "Reference"),
+        p("[2] SCHULZRINNE, H. et al. <i>RTP: A Transport Protocol for Real Time Applications</i>. RFC 3550, 2003.", "Reference"),
+        p("[3] VALIN, J. M., VOS, K. e TERRIBERRY, T. <i>Definition of the Opus Audio Codec</i>. RFC 6716, 2012.", "Reference"),
+        p("[4] RADFORD, A. et al. Robust Speech Recognition via Large Scale Weak Supervision. ICML, 2023.", "Reference"),
     ]
     return story
 
@@ -525,7 +525,7 @@ def main() -> None:
         rightMargin=20 * mm,
         topMargin=18 * mm,
         bottomMargin=19 * mm,
-        title="Relatório Final - Projeto 2 de Redes",
+        title="Relatório Final do Projeto 2 de Redes",
         author="Lucas D'Amato Nitz e Victor Dutra",
         subject="Áudio ao vivo com transcrição, resumo e integridade de legendas",
     )
